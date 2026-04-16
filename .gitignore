@@ -4,6 +4,8 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.venv-api/
+.venv-worker/
 .env
 .env.local
 .pytest_cache/
@@ -16,6 +18,10 @@ dist/
 .vite/
 *.log
 .DS_Store
+# Output from `tsc -b` in web/
+web/src/**/*.js
+web/vite.config.js
+web/tsconfig.tsbuildinfo
 
 # Data / models
 /data/raw/
