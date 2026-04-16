@@ -21,7 +21,7 @@ def fetch(from_dt: datetime, to_dt: datetime, max_records: int = 250) -> Iterabl
         "maxrecords": max_records,
         "sort": "datedesc",
     }
-    r = httpx.get(GDELT_URL, params=params, timeout=45.0)
+    r = httpx.get(GDELT_URL, params=params, timeout=45.0, follow_redirects=True)
     if r.status_code != 200:
         return
     try:
