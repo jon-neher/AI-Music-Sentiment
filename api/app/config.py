@@ -19,7 +19,29 @@ class Settings(BaseSettings):
 
     @property
     def resolved_database_url(self) -> str:
-        return self.database_url or self.database_public_url
+        return _normalize_pg_url(self.database_url or self.database_public_url)
+
+
+def _normalize_pg_url(url: str) -> str:
+    """Ensure the URL uses the psycopg (v3) SQLAlchemy dialect.
+
+    Railway's Postgres plugin injects DATABASE_URL as ``postgresql://…`` (or
+    occasionally ``postgres://…``). SQLAlchemy's default driver for both of
+    those schemes is psycopg2, which we do not install -- we ship psycopg 3
+    via ``psycopg[binary]``. Rewriting the scheme to ``postgresql+psycopg``
+    makes SQLAlchemy pick the installed driver.
+    """
+    if not url:
+        return url
+    for prefix in ("postgresql+psycopg://", "postgresql+psycopg2://",
+                   "sqlite", "mysql"):
+        if url.startswith(prefix):
+            return url
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    return url
 
 
 @lru_cache
