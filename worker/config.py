@@ -1,0 +1,34 @@
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    database_url: str = ""  # required; set via env (e.g. Railway Postgres plugin)
+
+    reddit_client_id: str = ""
+    reddit_client_secret: str = ""
+    reddit_user_agent: str = "ai-sentiment-sonification/0.1"
+
+    newsapi_key: str = ""
+
+    sentiment_model: str = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+    emotion_model: str = "j-hartmann/emotion-english-distilroberta-base"
+
+    ai_keywords: str = (
+        "artificial intelligence,AI,machine learning,deep learning,neural network,"
+        "LLM,large language model,GPT,ChatGPT,transformer,AGI,generative AI,"
+        "foundation model,diffusion model"
+    )
+
+    backfill_start: str = "2015-01-01"
+
+    @property
+    def keywords(self) -> list[str]:
+        return [k.strip().lower() for k in self.ai_keywords.split(",") if k.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
