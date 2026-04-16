@@ -24,32 +24,32 @@ make happy    # install api + web, typecheck, build, api import smoke
 Add `make install-worker && make smoke-worker` only if you've touched
 `worker/` -- it pulls torch (~1.5 GB). CI runs all three jobs on PRs.
 
-## Conventions to preserve
+## Invariants to preserve
 
-- **Postgres driver.** We use psycopg 3 (`psycopg[binary]`), not psycopg2.
-  `Settings.resolved_database_url` rewrites any `postgresql://` URL to
-  `postgresql+psycopg://` -- always go through that property, never read
-  `settings.database_url` directly when creating an engine.
-- **DB URL fallback.** `DATABASE_URL` wins, falls back to
+Each item is a constraint plus the failure mode it prevents, so you
+recognise regressions quickly.
+
+- **Postgres driver = psycopg 3** (`psycopg[binary]`). Always go through
+  `Settings.resolved_database_url`, which rewrites `postgresql://` to
+  `postgresql+psycopg://`. Direct use of `settings.database_url` in a
+  `create_engine` call fails with
+  `ModuleNotFoundError: No module named 'psycopg2'`.
+- **DB URL fallback order:** `DATABASE_URL` wins, falls back to
   `DATABASE_PUBLIC_URL`. Railway injects both; external envs (Factory
-  cloud, CI, local) use the public one.
-- **FastAPI responses.** `default_response_class=ORJSONResponse` is
-  intentional (orjson is a dep). Don't set it to `None`.
-- **Railway `startCommand`.** Must be wrapped in `sh -c '...'` whenever
-  it contains `${VAR}`; Railway exec's the command without a shell.
-- **Minimal comments.** Match existing style; add comments only when
+  cloud, CI, local dev) use the public one.
+- **FastAPI response class:** keep `default_response_class=ORJSONResponse`.
+  Setting it to `None` raises
+  `TypeError: 'NoneType' object is not callable` on every request.
+- **Railway `startCommand` with `${VAR}`:** wrap in `sh -c '...'`. Railway
+  exec's the command without a shell, so unwrapped variables reach the
+  process literally, e.g.
+  `Invalid value for '--port': '${PORT:-8000}'`.
+- **Railway config discovery:** `railway.json` must live in each service's
+  Root Directory (`api/`, `worker/`, `web/`). Railway does not look in
+  `infra/`; a stray config there silently falls through to Railpack and
+  fails with "No start command detected".
+- **Minimal comments:** match existing style; add comments only when
   behavior is non-obvious.
-
-## Common pitfalls (seen in Railway logs)
-
-- `ModuleNotFoundError: No module named 'psycopg2'` -- URL wasn't
-  normalized. Use `resolved_database_url`.
-- `Invalid value for '--port': '${PORT:-8000}'` -- missing `sh -c` wrapper
-  in a `railway.json` start command.
-- `'NoneType' object is not callable` from ASGI -- someone set
-  `default_response_class=None` again.
-- "No start command detected" on Railway -- Railway only auto-discovers
-  `railway.json` at the service's Root Directory, not inside `infra/`.
 
 ## Where to add things
 
