@@ -18,8 +18,20 @@ class Settings(BaseSettings):
     reddit_client_id: str = ""
     reddit_client_secret: str = ""
     reddit_user_agent: str = "ai-sentiment-sonification/0.1"
+    # AI-focused subs: every post is on-topic, pulled unfiltered.
+    reddit_subs_ai: str = "MachineLearning,LocalLLaMA,singularity,OpenAI,artificial,ChatGPT"
+    # General high-traffic subs: pulled and keyword-filtered with `ai_keywords`
+    # to surface how AI is discussed in the broader news/public cycle.
+    reddit_subs_general: str = (
+        "news,worldnews,technology,science,Futurology,UpliftingNews,Economics,business"
+    )
 
     newsapi_key: str = ""
+
+    # Bluesky (optional; enables Bluesky ingest). Use an app password, not your
+    # account password: https://bsky.app/settings/app-passwords
+    bluesky_identifier: str = ""
+    bluesky_app_password: str = ""
 
     sentiment_model: str = "cardiffnlp/twitter-roberta-base-sentiment-latest"
     emotion_model: str = "j-hartmann/emotion-english-distilroberta-base"
@@ -35,6 +47,14 @@ class Settings(BaseSettings):
     @property
     def keywords(self) -> list[str]:
         return [k.strip().lower() for k in self.ai_keywords.split(",") if k.strip()]
+
+    @property
+    def ai_subs_list(self) -> list[str]:
+        return [s.strip() for s in self.reddit_subs_ai.split(",") if s.strip()]
+
+    @property
+    def general_subs_list(self) -> list[str]:
+        return [s.strip() for s in self.reddit_subs_general.split(",") if s.strip()]
 
 
 def _normalize_pg_url(url: str) -> str:
