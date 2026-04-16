@@ -22,7 +22,7 @@ def fetch(from_ts: int, to_ts: int, max_pages: int = 50) -> Iterable[RawPost]:
     keywords = settings.keywords
     query = "AI OR \"artificial intelligence\" OR \"machine learning\" OR LLM OR GPT"
 
-    with httpx.Client(timeout=30.0) as client:
+    with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         for page in range(max_pages):
             params = {
                 "query": query,

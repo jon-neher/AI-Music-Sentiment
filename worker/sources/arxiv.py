@@ -10,7 +10,7 @@ import feedparser
 
 from . import RawPost
 
-ARXIV_URL = "http://export.arxiv.org/api/query?"
+ARXIV_URL = "https://export.arxiv.org/api/query?"
 
 
 def fetch(from_dt: datetime, to_dt: datetime, max_results_per_page: int = 200) -> Iterable[RawPost]:
@@ -26,7 +26,7 @@ def fetch(from_dt: datetime, to_dt: datetime, max_results_per_page: int = 200) -
             "sortBy": "submittedDate",
             "sortOrder": "descending",
         })
-        r = httpx.get(ARXIV_URL + q, timeout=60.0)
+        r = httpx.get(ARXIV_URL + q, timeout=60.0, follow_redirects=True)
         r.raise_for_status()
         feed = feedparser.parse(r.text)
         if not feed.entries:
