@@ -5,7 +5,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = ""  # required; set via env (e.g. Railway Postgres plugin)
+    # Railway's Postgres plugin injects BOTH DATABASE_URL (private, used inside
+    # the Railway network) and DATABASE_PUBLIC_URL (public TCP proxy, reachable
+    # from Factory cloud machines / local dev). Prefer DATABASE_URL; fall back.
+    database_url: str = ""
+    database_public_url: str = ""
+
+    @property
+    def resolved_database_url(self) -> str:
+        return self.database_url or self.database_public_url
 
     reddit_client_id: str = ""
     reddit_client_secret: str = ""
