@@ -35,7 +35,7 @@ jobs:
       - name: api import smoke
         working-directory: api
         env:
-          DATABASE_URL: sqlite+pysqlite:///:memory:
+          DATABASE_URL: "sqlite+pysqlite:///:memory:"
         run: python -c "from app import main; print('api import OK')"
 
   worker:
@@ -50,7 +50,7 @@ jobs:
       - run: pip install -r worker/requirements.txt
       - name: worker import smoke
         env:
-          DATABASE_URL: sqlite+pysqlite:///:memory:
+          DATABASE_URL: "sqlite+pysqlite:///:memory:"
           TRANSFORMERS_OFFLINE: "1"
           HF_HUB_OFFLINE: "1"
         run: python -c "import worker.schedule; print('worker import OK')"
