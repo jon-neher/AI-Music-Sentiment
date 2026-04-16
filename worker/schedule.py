@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sqlalchemy import func, select
@@ -16,27 +16,60 @@ from .db import Post, SessionLocal, init_db
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("worker.schedule")
 
-# A fresh deploy starts with 0 rows; anything below this triggers a one-shot
-# historical backfill so the UI isn't blank while the hourly cron slowly fills
-# in. Upserts make the backfill idempotent across restarts.
-_BACKFILL_THRESHOLD = 100
+# Tolerance for the tail-gap check: if the newest post is within this window of
+# "now", the hourly cron is expected to fill the remainder; don't step on it.
+_TAIL_TOLERANCE = timedelta(hours=2)
+# Tolerance for the head-gap check: if the oldest post is within this window of
+# the configured backfill_start, treat the head as fully covered.
+_HEAD_TOLERANCE = timedelta(days=1)
+
+
+def _ensure_utc(dt: datetime) -> datetime:
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _plan_backfill_windows() -> list[tuple[datetime, datetime]]:
+    """Inspect the posts table and return the (start, end) windows still missing.
+
+    - Empty DB -> one window from configured_start to now.
+    - Populated DB -> up to two windows: a head gap (configured_start .. min)
+      and/or a tail gap (max .. now). Returns [] when fully covered.
+    """
+    settings = get_settings()
+    configured_start = datetime.fromisoformat(settings.backfill_start).replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+
+    with SessionLocal() as s:
+        row = s.execute(
+            select(func.min(Post.published_at), func.max(Post.published_at), func.count(Post.id))
+        ).first()
+    first, last, total = (row or (None, None, 0))
+
+    if not total:
+        return [(configured_start, now)]
+
+    first = _ensure_utc(first)
+    last = _ensure_utc(last)
+
+    windows: list[tuple[datetime, datetime]] = []
+    if first > configured_start + _HEAD_TOLERANCE:
+        windows.append((configured_start, first))
+    if last < now - _TAIL_TOLERANCE:
+        windows.append((last, now))
+    return windows
 
 
 def _maybe_backfill() -> None:
-    with SessionLocal() as s:
-        n = s.scalar(select(func.count(Post.id))) or 0
-    if n >= _BACKFILL_THRESHOLD:
-        log.info("Skipping backfill (%d posts already present).", n)
+    windows = _plan_backfill_windows()
+    if not windows:
+        log.info("Backfill: no gaps detected; scheduler will arm immediately.")
         return
-
-    settings = get_settings()
-    start = datetime.fromisoformat(settings.backfill_start).replace(tzinfo=timezone.utc)
-    end = datetime.now(timezone.utc)
-    log.info("Posts table nearly empty (%d rows); backfilling %s -> %s", n, start.date(), end.date())
-    try:
-        run_backfill(start, end)
-    except Exception:
-        log.exception("Auto-backfill failed; scheduler will still arm.")
+    for start, end in windows:
+        log.info("Backfill: filling gap %s -> %s", start.date(), end.date())
+        try:
+            run_backfill(start, end)
+        except Exception:
+            log.exception("Backfill window %s-%s failed; continuing.", start.date(), end.date())
 
 
 def main() -> None:
