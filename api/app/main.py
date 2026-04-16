@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
 
 from .config import get_settings
 from .db import Base, engine
@@ -8,7 +9,10 @@ from .routes import live as live_routes
 
 settings = get_settings()
 
-app = FastAPI(title="AI Sentiment Sonification API", default_response_class=None)
+app = FastAPI(
+    title="AI Sentiment Sonification API",
+    default_response_class=ORJSONResponse,
+)
 
 origins = [o.strip() for o in settings.cors_origins.split(",")] if settings.cors_origins else ["*"]
 app.add_middleware(
