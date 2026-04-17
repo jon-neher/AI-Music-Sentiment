@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, List
+from typing import Callable, Iterable, List
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -14,6 +14,10 @@ from .sources import RawPost
 from .sources import hn as hn_source
 from .sources import arxiv as arxiv_source
 from .sources import gdelt as gdelt_source
+from .sources import reddit as reddit_source
+from .sources import newsapi as newsapi_source
+from .sources import semanticscholar as ss_source
+from .sources import bluesky as bluesky_source
 
 log = logging.getLogger(__name__)
 
@@ -60,35 +64,38 @@ def run_window(from_dt: datetime, to_dt: datetime) -> dict:
     init_db()
     log.info("Ingest %s -> %s", from_dt.isoformat(), to_dt.isoformat())
 
-    totals = {"hn": 0, "arxiv": 0, "gdelt": 0}
+    from_ts = int(from_dt.timestamp())
+    to_ts = int(to_dt.timestamp())
+
+    sources: List[tuple[str, Callable[[], Iterable[RawPost]]]] = [
+        ("hn",              lambda: hn_source.fetch(from_ts, to_ts)),
+        ("arxiv",           lambda: arxiv_source.fetch(from_dt, to_dt)),
+        ("gdelt",           lambda: gdelt_source.fetch(from_dt, to_dt)),
+        ("reddit",          lambda: reddit_source.fetch(from_ts, to_ts)),
+        ("newsapi",         lambda: newsapi_source.fetch(from_dt, to_dt)),
+        ("semanticscholar", lambda: ss_source.fetch(from_dt, to_dt)),
+        ("bluesky",         lambda: bluesky_source.fetch(from_dt, to_dt)),
+    ]
+
+    totals: dict = {name: 0 for name, _ in sources}
     batch: List[RawPost] = []
 
-    def flush():
-        nonlocal batch
+    def flush() -> None:
         if batch:
             _upsert_posts(batch)
-            batch = []
+            batch.clear()
 
-    for post in hn_source.fetch(int(from_dt.timestamp()), int(to_dt.timestamp())):
-        batch.append(post)
-        totals["hn"] += 1
-        if len(batch) >= 64:
+    for name, factory in sources:
+        try:
+            for post in factory():
+                batch.append(post)
+                totals[name] += 1
+                if len(batch) >= 64:
+                    flush()
             flush()
-    flush()
-
-    for post in arxiv_source.fetch(from_dt, to_dt):
-        batch.append(post)
-        totals["arxiv"] += 1
-        if len(batch) >= 64:
+        except Exception:
+            log.exception("Source %s aborted; continuing with remaining sources.", name)
             flush()
-    flush()
-
-    for post in gdelt_source.fetch(from_dt, to_dt):
-        batch.append(post)
-        totals["gdelt"] += 1
-        if len(batch) >= 64:
-            flush()
-    flush()
 
     log.info("Ingest complete: %s", totals)
     return totals
