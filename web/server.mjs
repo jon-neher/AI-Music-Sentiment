@@ -20,12 +20,43 @@ import { fileURLToPath } from "node:url";
 
 const DIST = resolve(fileURLToPath(new URL("./dist", import.meta.url)));
 const PORT = Number(process.env.PORT || 4173);
-const RAW_API = process.env.API_BASE_URL || "";
+const RAW_API = (process.env.API_BASE_URL || "").trim();
 if (!RAW_API) {
   console.error("FATAL: API_BASE_URL is not set. /api/* requests would be served the SPA fallback.");
   process.exit(1);
 }
-const API_BASE = new URL(RAW_API);
+
+function resolveApiBase(raw) {
+  // Auto-prepend a scheme if the user gave us a bare host[:port]. Railway
+  // internal networking is plain HTTP, so default to http:// there.
+  let s = raw;
+  if (!/^https?:\/\//i.test(s)) {
+    const defaultScheme = /\.railway\.internal(\b|:)/i.test(s) ? "http" : "https";
+    s = `${defaultScheme}://${s}`;
+  }
+  let url;
+  try {
+    url = new URL(s);
+  } catch (err) {
+    console.error(`FATAL: API_BASE_URL=${JSON.stringify(raw)} is not parseable as a URL: ${err.message}`);
+    process.exit(1);
+  }
+  // Railway's private network doesn't expose default ports; an explicit port
+  // is required on *.railway.internal hosts, otherwise the proxy will just
+  // hang or ECONNREFUSED at request time.
+  if (/\.railway\.internal$/i.test(url.hostname) && !url.port) {
+    console.error(
+      `FATAL: API_BASE_URL=${JSON.stringify(raw)} points at a Railway internal host but has no port.\n` +
+      `Internal URLs must include the upstream's listening port, e.g.\n` +
+      `  API_BASE_URL=http://ai-music-sentiment-277b.railway.internal:8000\n` +
+      `Find the api service's $PORT in its Railway settings (or use its public URL).`,
+    );
+    process.exit(1);
+  }
+  return url;
+}
+
+const API_BASE = resolveApiBase(RAW_API);
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
