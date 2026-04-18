@@ -19,6 +19,16 @@ user.
 
 ```bash
 make happy    # install api + web, typecheck, test, build, api import smoke
+make lint     # eslint (web) + ruff (api + worker)
+make test     # pytest (api) + vitest (web)
+```
+
+Heavier checks that don't run on every commit:
+
+```bash
+cd web && npm run test:e2e   # Playwright mobile smoke (needs chromium)
+PROD_API_BASE=https://... make check-prod   # data-health probe
+pre-commit install && pre-commit run -a     # hygiene + ruff + eslint + gitleaks
 ```
 
 Add `make install-worker && make smoke-worker` only if you've touched
@@ -76,6 +86,12 @@ the Vite/TS app.
 - **`npm test` is part of the happy path.** Vitest + jsdom. Add new
   tests under `web/src/**/*.test.ts` and keep `npm run typecheck`
   green.
+- **E2E lives in `web/e2e/`** (Playwright, iPhone 12 + Pixel 5). API
+  calls must be stubbed with `page.route` so the test is hermetic; see
+  `web/e2e/mobile-constellation.spec.ts`.
+- **Ruff is scoped narrowly** (E/F/W only). Broadening it to `I/B/UP`
+  is intentional future work -- do it in a dedicated cleanup PR so
+  auto-fixes don't mask real review diffs.
 
 ## Where to add things
 

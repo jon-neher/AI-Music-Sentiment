@@ -1,0 +1,15 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv-api", ".venv-worker", "web/dist", "web/node_modules"]
+
+[tool.ruff.lint]
+# Start conservative: just the real-bug rules. We can layer in I/B/UP later
+# and auto-fix them in a dedicated cleanup PR.
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line length handled by formatter where it matters
+]
+
+[tool.ruff.lint.per-file-ignores]
+"api/tests/*" = ["B018"]

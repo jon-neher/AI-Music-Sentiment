@@ -1,0 +1,31 @@
+name: prod-health
+
+# Nightly sanity check of the live API. Set repo variable PROD_API_BASE to
+# e.g. https://api.example.com to enable; the job is a no-op otherwise.
+on:
+  schedule:
+    - cron: "17 6 * * *"  # 06:17 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+      - name: install
+        run: pip install httpx==0.27.2
+      - name: probe /api/stats
+        env:
+          PROD_API_BASE: ${{ vars.PROD_API_BASE }}
+          MIN_TOTAL_POSTS: ${{ vars.PROD_MIN_TOTAL_POSTS || '1000' }}
+          MIN_CATEGORY_ROWS: ${{ vars.PROD_MIN_CATEGORY_ROWS || '5' }}
+          MAX_STALENESS_HOURS: ${{ vars.PROD_MAX_STALENESS_HOURS || '48' }}
+        run: |
+          if [ -z "${PROD_API_BASE}" ]; then
+            echo "PROD_API_BASE not set; skipping. Configure the repo variable to enable."
+            exit 0
+          fi
+          python scripts/prod_health.py
