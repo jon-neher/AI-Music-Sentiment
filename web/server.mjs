@@ -18,6 +18,11 @@ import { createReadStream, statSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Railway's private network is IPv6-only. We can't use
+// dns.setDefaultResultOrder("ipv6first") -- it only accepts "verbatim" or
+// "ipv4first" on Node 20.x. Instead we pass `family: 6` per-request for
+// *.railway.internal hostnames; see proxy() below.
+
 const DIST = resolve(fileURLToPath(new URL("./dist", import.meta.url)));
 const PORT = Number(process.env.PORT || 4173);
 const RAW_API = (process.env.API_BASE_URL || "").trim();
@@ -97,25 +102,48 @@ function proxy(req, res) {
   delete headers["content-length"];
   delete headers["accept-encoding"]; // let the upstream choose; we don't re-compress
 
-  const upstream = client.request(
-    target,
-    { method: req.method, headers },
-    (upRes) => {
+  // Force IPv6 for Railway's private network. Harmless for public hosts that
+  // have AAAA records; if they don't, Node falls back to whatever resolves.
+  const reqOpts = { method: req.method, headers };
+  if (/\.railway\.internal$/i.test(target.hostname)) {
+    reqOpts.family = 6;
+  }
+
+  let upstream;
+  try {
+    upstream = client.request(target, reqOpts, (upRes) => {
       res.writeHead(upRes.statusCode || 502, upRes.headers);
       upRes.pipe(res);
-    },
-  );
-
-  upstream.on("error", (err) => {
-    console.error(`proxy error ${req.method} ${req.url} -> ${target.href}:`, err.message);
+    });
+  } catch (err) {
+    // http.request can throw synchronously on bad input. Surface the message
+    // instead of the generic "internal error" from the outer try/catch.
+    console.error(`proxy sync-throw ${req.method} ${req.url} -> ${target.href}:`, err);
     if (!res.headersSent) {
       res.writeHead(502, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "bad_gateway", detail: err.message }));
+      res.end(JSON.stringify({ error: "bad_gateway", detail: String(err.message || err) }));
+    }
+    return;
+  }
+
+  upstream.on("error", (err) => {
+    console.error(`proxy error ${req.method} ${req.url} -> ${target.href}:`, err);
+    if (!res.headersSent) {
+      res.writeHead(502, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "bad_gateway",
+          detail: String(err.message || err),
+          code: err.code,
+          target: target.href,
+        }),
+      );
     } else {
       res.end();
     }
   });
 
+  req.on("aborted", () => upstream.destroy());
   req.pipe(upstream);
 }
 
@@ -163,8 +191,11 @@ const server = http.createServer((req, res) => {
     if (isApiPath(req.url || "")) return proxy(req, res);
     return serveStatic(req, res);
   } catch (err) {
-    console.error("handler error:", err);
-    if (!res.headersSent) res.writeHead(500).end("internal error");
+    console.error(`handler error ${req.method} ${req.url}:`, err);
+    if (!res.headersSent) {
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "internal", detail: String(err.message || err) }));
+    }
   }
 });
 
