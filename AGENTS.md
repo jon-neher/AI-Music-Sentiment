@@ -18,7 +18,7 @@ user.
 ## Happy path (run before pushing)
 
 ```bash
-make happy    # install api + web, typecheck, build, api import smoke
+make happy    # install api + web, typecheck, test, build, api import smoke
 ```
 
 Add `make install-worker && make smoke-worker` only if you've touched
@@ -50,6 +50,32 @@ recognise regressions quickly.
   fails with "No start command detected".
 - **Minimal comments:** match existing style; add comments only when
   behavior is non-obvious.
+
+## Frontend invariants (web/)
+
+Pitfalls that have bitten us before -- keep these in mind when editing
+the Vite/TS app.
+
+- **Don't wipe `.canvas` innerHTML** inside visualization constructors.
+  `web/src/main.ts` puts a `.controls` chip (and quote cards) inside
+  `<section class="canvas">`; `new Constellation(canvasEl)` must append
+  its SVG alongside those siblings, not replace them. Covered by
+  `web/src/viz/constellation.test.ts`.
+- **First paint can be 0x0 on iOS Safari.** Any d3-rendered SVG inside
+  the CSS-grid `1fr` canvas row must tolerate
+  `getBoundingClientRect() == 0x0` on its initial render. The landing
+  overlay fades for 800 ms while `begin()` synchronously calls
+  `render()`, so the stage frequently isn't laid out yet. Use a fallback
+  chain (svg rect -> container rect -> `window.inner*`) plus a
+  `requestAnimationFrame` retry. Also attach a `ResizeObserver` so the
+  visualization recovers when layout settles.
+- **Category "public" may be near-empty** until the Reddit/Bluesky/
+  NewsAPI ingest keys are configured. GDELT only emits `business`. If
+  you're filtering the constellation to `public` and seeing nothing,
+  check `/api/stats` before assuming a render bug.
+- **`npm test` is part of the happy path.** Vitest + jsdom. Add new
+  tests under `web/src/**/*.test.ts` and keep `npm run typecheck`
+  green.
 
 ## Where to add things
 
