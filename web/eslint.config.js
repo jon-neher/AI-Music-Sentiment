@@ -54,4 +54,27 @@ export default [
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
+  // Node-side scripts (prod server, tooling) use Node globals, not browser globals.
+  {
+    files: ["server.mjs", "scripts/**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        setImmediate: "readonly",
+        clearImmediate: "readonly",
+        globalThis: "readonly",
+        fetch: "readonly",
+      },
+    },
+  },
 ];
