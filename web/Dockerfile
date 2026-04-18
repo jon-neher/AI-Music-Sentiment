@@ -11,11 +11,10 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Only ship runtime deps (serve) and the built bundle.
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
+# Zero runtime deps: the proxy server uses only node: built-ins.
+COPY package.json ./
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server.mjs ./server.mjs
 
 EXPOSE 4173
 CMD ["npm", "start"]

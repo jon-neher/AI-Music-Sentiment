@@ -92,6 +92,16 @@ the Vite/TS app.
 - **Ruff is scoped narrowly** (E/F/W only). Broadening it to `I/B/UP`
   is intentional future work -- do it in a dedicated cleanup PR so
   auto-fixes don't mask real review diffs.
+- **Web runtime requires `API_BASE_URL`.** The production web service
+  runs `node server.mjs` (see `web/server.mjs`), which serves the SPA
+  and reverse-proxies `/api/*` and `/ws/*` to the API. If the env var
+  is unset the server exits on start. In Railway this should point at
+  the api service -- either its public hostname
+  (`https://ai-music-sentiment-api-production.up.railway.app`) or,
+  preferred, its private network URL (`http://<api>.railway.internal:$PORT`).
+  **Do not** set `VITE_API_BASE` in the build: the frontend uses the
+  default `/api` prefix and relies on the server-side proxy, which
+  keeps requests same-origin and avoids CORS.
 
 ## Where to add things
 
