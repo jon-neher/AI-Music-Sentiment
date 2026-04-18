@@ -1,0 +1,48 @@
+# pre-commit hooks for local + CI. Install once per clone with:
+#   pip install pre-commit && pre-commit install
+#
+# Hygiene + secret scanning run on every file; ruff covers api/ and worker/;
+# eslint + tsc cover web/. Heavy checks (pytest, vitest, playwright) stay in
+# the Make targets / CI to keep commits fast.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-case-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.2
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        files: ^(api|worker)/
+      - id: ruff-format
+        files: ^(api|worker)/
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: web-typecheck
+        name: web tsc --noEmit
+        language: system
+        entry: bash -c 'cd web && npm run -s typecheck'
+        files: ^web/(src|.*\.(ts|tsx|json))
+        pass_filenames: false
+      - id: web-eslint
+        name: web eslint
+        language: system
+        entry: bash -c 'cd web && npx --no-install eslint .'
+        files: ^web/(src|e2e)/.*\.ts$
+        pass_filenames: false

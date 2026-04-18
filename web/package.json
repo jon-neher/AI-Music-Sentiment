@@ -10,7 +10,9 @@
     "start": "serve -s dist -l ${PORT:-4173}",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint": "eslint ."
   },
   "dependencies": {
     "d3": "^7.9.0",
@@ -18,9 +20,13 @@
     "tone": "^15.0.4"
   },
   "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "@playwright/test": "^1.48.2",
     "@types/d3": "^7.4.3",
+    "eslint": "^9.14.0",
     "jsdom": "^25.0.1",
     "typescript": "^5.5.4",
+    "typescript-eslint": "^8.12.2",
     "vite": "^5.4.8",
     "vitest": "^2.1.4"
   }

@@ -1,6 +1,5 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-import pytest
 
 from app.models import Post, DailyAggregate
 from app.schemas import PostOut

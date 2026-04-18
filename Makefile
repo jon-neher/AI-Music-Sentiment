@@ -7,7 +7,7 @@ VENV_WORKER := .venv-worker
 SMOKE_DB_URL ?= sqlite+pysqlite:///tmp/sentiment.db
 
 .PHONY: help install install-api install-web install-worker \
-        typecheck build test test-api test-web \
+        typecheck build test test-api test-web lint check-prod \
         smoke smoke-api smoke-worker happy \
         clean
 
@@ -44,6 +44,14 @@ build:
 	cd web && npm run build
 
 test: test-api test-web
+
+lint:
+	cd web && npm run lint
+	python3 -m ruff check api worker
+
+check-prod:
+	PROD_API_BASE="$${PROD_API_BASE:?set PROD_API_BASE=https://api.example.com}" \
+		python3 scripts/prod_health.py
 
 test-api:
 	cd api && DATABASE_URL="$${DATABASE_URL:-$(SMOKE_DB_URL)}" ../$(VENV_API)/bin/python -m pytest -q
