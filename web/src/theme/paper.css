@@ -221,6 +221,13 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 .canvas svg.constellation path.dot[data-cat="science"]  { opacity: var(--opacity-science, 1); }
 .canvas svg.constellation path.dot { transition: opacity 260ms ease; }
 
+/* Marginalia + ghost-axes layers — all non-interactive overlays. Let clicks
+   fall through to dots beneath. */
+.canvas svg.constellation g.margins,
+.canvas svg.constellation g.ghost-axes { pointer-events: none; }
+.canvas svg.constellation g.margins text.axis-annot { user-select: none; -webkit-user-select: none; }
+.canvas svg.constellation g.ghost-axes { transition: opacity 240ms ease; }
+
 /* ------------------------------------------------------------------ */
 /* Floating stage controls (top-right of canvas, hand-lettered)        */
 /* ------------------------------------------------------------------ */
@@ -248,6 +255,20 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 .canvas .controls .chip:hover { border-color: var(--ink); }
+.canvas .controls .chip.is-on {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* The "?" axes toggle stays a fixed-width glyph so the row doesn't shift
+   between the collapsed and expanded states. */
+.canvas .controls .axes-toggle {
+  min-width: 28px;
+  padding: 2px 6px;
+  font-family: var(--font-serif);
+  font-size: clamp(14px, 1.5vw, 16px);
+}
 
 /* "In this window" — hand-lettered link, not a chip */
 .canvas .controls .sources-toggle {
