@@ -21,6 +21,8 @@ function makePost(id: string, overrides: Partial<PostOut> = {}): PostOut {
   };
 }
 
+
+
 // jsdom doesn't implement ResizeObserver; capture the callback so tests can fire it.
 let roCallback: ((entries: unknown) => void) | null = null;
 
@@ -243,7 +245,116 @@ describe("Constellation", () => {
     new Constellation(canvas);
     // One of each layer, no matter how many constructors ran.
     expect(canvas.querySelectorAll("g.dots").length).toBe(1);
+    expect(canvas.querySelectorAll("g.edges").length).toBe(1);
     expect(canvas.querySelectorAll("g.margins").length).toBe(1);
     expect(canvas.querySelectorAll("g.ghost-axes").length).toBe(1);
+  });
+
+  it("defaults to cluster mode and exposes getMode()", () => {
+    const c = new Constellation(canvas);
+    expect(c.getMode()).toBe("cluster");
+  });
+
+  it("scatter mode removes edges; cluster/graph render them", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    // Two posts with 2 shared topics -> one edge.
+    const posts = [
+      makePost("a", { topics: ["ai", "regulation"], published_at: new Date("2025-06-01T00:00:00Z").toISOString() }),
+      makePost("b", { topics: ["ai", "regulation"], published_at: new Date("2025-06-02T00:00:00Z").toISOString() }),
+    ];
+    c.render(posts);
+    // Default cluster mode: one edge line in g.edges.
+    expect(canvas.querySelectorAll("g.edges line.edge").length).toBe(1);
+
+    // Switch to scatter: edges cleared.
+    c.setMode("scatter");
+    expect(canvas.querySelectorAll("g.edges line.edge").length).toBe(0);
+
+    // Switch to graph: edges back.
+    c.setMode("graph");
+    expect(canvas.querySelectorAll("g.edges line.edge").length).toBe(1);
+  });
+
+  it("graph mode replaces hopeful/fearful/dates with a graph-view caption", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    c.render([
+      makePost("a", { topics: ["ai"] }),
+      makePost("b", { topics: ["ai"], published_at: new Date("2025-06-02T00:00:00Z").toISOString() }),
+    ]);
+
+    c.setMode("graph");
+    const annots = Array.from(canvas.querySelectorAll("g.margins text"))
+      .map(t => t.textContent);
+    expect(annots.some(a => /graph view/.test(a ?? ""))).toBe(true);
+    expect(annots).not.toContain("↑ hopeful");
+    expect(annots).not.toContain("fearful ↓");
+    expect(annots).not.toContain("neutral");
+  });
+
+  it("ghost axes suppressed in graph mode even when axesOn=true", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    c.render([
+      makePost("a", { topics: ["ai"] }),
+      makePost("b", { topics: ["ai"], published_at: new Date("2025-06-02T00:00:00Z").toISOString() }),
+    ]);
+    c.setAxes(true);
+
+    // Scatter or cluster mode: axes populated.
+    c.setMode("cluster");
+    expect(canvas.querySelectorAll("g.ghost-axes *").length).toBeGreaterThan(0);
+
+    // Graph: ghost axes cleared.
+    c.setMode("graph");
+    expect(canvas.querySelectorAll("g.ghost-axes *").length).toBe(0);
+  });
+
+  it("hover over a dot fades non-neighbors and emphasizes the linked edges", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    const posts = [
+      makePost("a", { topics: ["ai", "regulation"], published_at: new Date("2025-06-01T00:00:00Z").toISOString() }),
+      makePost("b", { topics: ["ai", "regulation"], published_at: new Date("2025-06-02T00:00:00Z").toISOString() }),
+      makePost("c", { topics: ["music"], published_at: new Date("2025-06-03T00:00:00Z").toISOString() }),
+    ];
+    c.render(posts);
+
+    // Wait for enter transition to settle fill-opacity to 0.75 baseline.
+    const dotA = canvas.querySelector<SVGPathElement>('path.dot[data-id="a"]')!;
+    const dotC = canvas.querySelector<SVGPathElement>('path.dot[data-id="c"]')!;
+    expect(dotA).not.toBeNull();
+    expect(dotC).not.toBeNull();
+
+    dotA.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+
+    // `a`'s neighbor is `b` (shared topics). `c` is unrelated -> faded.
+    const cOpacity = Number(dotC.getAttribute("fill-opacity"));
+    expect(cOpacity).toBeLessThan(0.5);
+    const edgeOpacity = Number(canvas.querySelector<SVGLineElement>("g.edges line.edge")!.getAttribute("stroke-opacity"));
+    expect(edgeOpacity).toBeGreaterThan(0.2); // emphasized
+
+    dotA.dispatchEvent(new Event("pointerleave", { bubbles: true }));
+    // Baseline restored.
+    expect(Number(dotC.getAttribute("fill-opacity"))).toBeCloseTo(0.75, 1);
+  });
+
+  it("edges are not rendered in scatter mode even when posts share topics", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    c.setMode("scatter");
+    c.render([
+      makePost("a", { topics: ["ai", "regulation"] }),
+      makePost("b", { topics: ["ai", "regulation"], published_at: new Date("2025-06-02T00:00:00Z").toISOString() }),
+    ]);
+    expect(canvas.querySelectorAll("g.edges line.edge").length).toBe(0);
+    // Dots still land at their scatter positions.
+    expect(canvas.querySelectorAll("path.dot").length).toBe(2);
   });
 });

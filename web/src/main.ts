@@ -1,6 +1,6 @@
 import { fetchWindow } from "./data/api";
 import { AudioEngine } from "./audio/engine";
-import { Constellation } from "./viz/constellation";
+import { Constellation, VIZ_MODES, type VizMode } from "./viz/constellation";
 import { Scrubber } from "./viz/scrubber";
 import { attachQuoteCards } from "./viz/quoteCards";
 import { renderDrawer } from "./ui/drawer";
@@ -33,6 +33,7 @@ function mountStage(): {
         <div class="controls">
           <button class="chip" id="playBtn" aria-label="Pause audio">Pause</button>
           <button class="chip" id="studioBtn" aria-label="Toggle studio panel" title="Press S">Studio</button>
+          <button class="chip mode-toggle" id="modeBtn" aria-label="Cycle layout mode" title="Layout: cluster (press G)">cluster</button>
           <button class="chip axes-toggle" id="axesBtn" aria-label="Toggle axes" title="Show axes" aria-pressed="false">?</button>
           <button class="chip sources-toggle" id="sourcesBtn" aria-label="Open sources panel" aria-expanded="false">In this window</button>
         </div>
@@ -96,6 +97,38 @@ async function begin(): Promise<void> {
     axesBtn.setAttribute("aria-pressed", String(on));
     axesBtn.classList.toggle("is-on", on);
     axesBtn.setAttribute("title", on ? "Hide axes" : "Show axes");
+  });
+
+  // Layout mode chip: cycles scatter -> cluster -> graph. The chip label is
+  // always the current mode so viewers can see at a glance what they're in.
+  // Keyboard alias "g" for power users.
+  const modeBtn = document.getElementById("modeBtn") as HTMLButtonElement;
+  document.body.dataset.vizMode = constellation.getMode();
+  const applyMode = (m: VizMode) => {
+    constellation.setMode(m);
+    modeBtn.textContent = m;
+    modeBtn.dataset.mode = m;
+    modeBtn.setAttribute("title", `Layout: ${m} (press G)`);
+    // Axes chip is meaningless in graph mode -- sentiment isn't on the Y axis.
+    axesBtn.disabled = m === "graph";
+    axesBtn.setAttribute("aria-disabled", String(m === "graph"));
+  };
+  applyMode(constellation.getMode());
+  modeBtn.addEventListener("click", () => {
+    const cur = constellation.getMode();
+    const next = VIZ_MODES[(VIZ_MODES.indexOf(cur) + 1) % VIZ_MODES.length];
+    applyMode(next);
+  });
+  window.addEventListener("keydown", (e) => {
+    // Ignore when focus is in an input; avoid double-handling inside other
+    // listeners that already consume these keys.
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+    if (e.key === "g" || e.key === "G") {
+      const cur = constellation.getMode();
+      const next = VIZ_MODES[(VIZ_MODES.indexOf(cur) + 1) % VIZ_MODES.length];
+      applyMode(next);
+    }
   });
 
   // Sources drawer toggle (tablet / mobile). On desktop the drawer is a

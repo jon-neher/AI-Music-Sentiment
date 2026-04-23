@@ -221,12 +221,20 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 .canvas svg.constellation path.dot[data-cat="science"]  { opacity: var(--opacity-science, 1); }
 .canvas svg.constellation path.dot { transition: opacity 260ms ease; }
 
-/* Marginalia + ghost-axes layers — all non-interactive overlays. Let clicks
+/* Marginalia + ghost-axes + edges — all non-interactive overlays. Let clicks
    fall through to dots beneath. */
 .canvas svg.constellation g.margins,
+.canvas svg.constellation g.edges,
 .canvas svg.constellation g.ghost-axes { pointer-events: none; }
 .canvas svg.constellation g.margins text.axis-annot { user-select: none; -webkit-user-select: none; }
 .canvas svg.constellation g.ghost-axes { transition: opacity 240ms ease; }
+
+/* Topic-overlap edges: faint ink rules that tighten slightly when a node in
+   the pair is hovered. stroke-opacity is set inline by Constellation so we
+   only supply the transition smoothing here. */
+.canvas svg.constellation g.edges line.edge {
+  transition: stroke-opacity 220ms ease;
+}
 
 /* ------------------------------------------------------------------ */
 /* Floating stage controls (top-right of canvas, hand-lettered)        */
@@ -268,6 +276,24 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   padding: 2px 6px;
   font-family: var(--font-serif);
   font-size: clamp(14px, 1.5vw, 16px);
+}
+.canvas .controls .axes-toggle[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Layout mode chip: always shows the active mode; click cycles through
+   scatter -> cluster -> graph. Hand-lettered like its siblings. */
+.canvas .controls .mode-toggle {
+  min-width: 62px;
+  text-align: center;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+.canvas .controls .mode-toggle[data-mode="graph"] {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
 }
 
 /* "In this window" — hand-lettered link, not a chip */
