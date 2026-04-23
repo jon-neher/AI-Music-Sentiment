@@ -76,7 +76,10 @@ def main() -> None:
     init_db()
     log.info("Worker starting; running an initial ingest.")
     try:
-        run_recent(hours=6)
+        # 2h catch-up window: any longer overlaps the hourly cron's own
+        # window and wastes DB probes. The backfill planner below fills
+        # gaps larger than _TAIL_TOLERANCE.
+        run_recent(hours=2)
         rollup_recent(days=2)
     except Exception:
         log.exception("Initial ingest failed")
