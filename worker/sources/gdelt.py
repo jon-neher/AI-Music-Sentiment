@@ -1,6 +1,7 @@
 """GDELT 2.0 DOC API ingest. Category = business. GDELT has built-in tone."""
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -37,7 +38,7 @@ def fetch(from_dt: datetime, to_dt: datetime, max_records: int = 250) -> Iterabl
         if not url:
             continue
         yield RawPost(
-            id=f"gdelt:{abs(hash(url))}",
+            id=f"gdelt:{hashlib.sha1(url.encode('utf-8')).hexdigest()[:40]}",
             source="gdelt",
             category="business",
             title=a.get("title") or "",

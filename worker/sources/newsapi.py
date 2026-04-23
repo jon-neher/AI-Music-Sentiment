@@ -10,6 +10,7 @@ and descriptions; GDELT stays the historical workhorse.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
@@ -69,7 +70,7 @@ def fetch(from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
             except ValueError:
                 continue
             yield RawPost(
-                id=f"newsapi:{abs(hash(url))}",
+                id=f"newsapi:{hashlib.sha1(url.encode('utf-8')).hexdigest()[:40]}",
                 source="newsapi",
                 category="business",
                 title=(a.get("title") or "").strip(),
