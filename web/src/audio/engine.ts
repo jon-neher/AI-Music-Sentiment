@@ -28,6 +28,15 @@ export interface BusMix {
   master: number;
 }
 
+export interface CategoryVisibility {
+  soloed: Category | null;
+  muted: Set<Category>;
+}
+
+/** Bus gain used for a category that is hushed by solo/mute. Not zero so the
+ *  ambient bed never fully disappears — you can still *tell* something is there. */
+const HUSHED_GAIN = 0.03;
+
 export class AudioEngine {
   private started = false;
   private reverb!: Tone.Reverb;
@@ -45,6 +54,11 @@ export class AudioEngine {
   private loopId: number | null = null;
   private currentScale = MODES.dorian;
   private density = 0.4;
+
+  /** User-set levels from the Studio panel / presets. Solo/mute then modulates
+   *  the actual bus gain *derived* from these — without clobbering them. */
+  private userMix: BusMix = { public: 0.7, business: 0.7, science: 0.7, master: 0.8 };
+  private visibility: CategoryVisibility = { soloed: null, muted: new Set() };
 
   async start(): Promise<void> {
     if (this.started) return;
@@ -106,11 +120,32 @@ export class AudioEngine {
   }
 
   setMix(mix: Partial<BusMix>): void {
+    if (mix.public !== undefined) this.userMix.public = mix.public;
+    if (mix.business !== undefined) this.userMix.business = mix.business;
+    if (mix.science !== undefined) this.userMix.science = mix.science;
+    if (mix.master !== undefined) this.userMix.master = mix.master;
+    this.applyMix();
+  }
+
+  /** Drive bus gains from a solo/mute state without overwriting the user's mix. */
+  setCategoryVisibility(state: CategoryVisibility): void {
+    this.visibility = { soloed: state.soloed, muted: new Set(state.muted) };
+    this.applyMix();
+  }
+
+  private isAudible(cat: Category): boolean {
+    const { soloed, muted } = this.visibility;
+    if (soloed) return cat === soloed;
+    return !muted.has(cat);
+  }
+
+  private applyMix(): void {
     if (!this.started) return;
-    if (mix.public !== undefined) this.busGains.public.gain.rampTo(mix.public, 0.3);
-    if (mix.business !== undefined) this.busGains.business.gain.rampTo(mix.business, 0.3);
-    if (mix.science !== undefined) this.busGains.science.gain.rampTo(mix.science, 0.3);
-    if (mix.master !== undefined) this.masterGain.gain.rampTo(mix.master, 0.3);
+    for (const cat of ["public", "business", "science"] as Category[]) {
+      const target = this.isAudible(cat) ? this.userMix[cat] : HUSHED_GAIN;
+      this.busGains[cat].gain.rampTo(target, 0.4);
+    }
+    this.masterGain.gain.rampTo(this.userMix.master, 0.3);
   }
 
   /** Update musical parameters from a window of aggregates + exemplars. */

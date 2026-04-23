@@ -6,15 +6,23 @@ import { attachQuoteCards } from "./viz/quoteCards";
 import { renderDrawer } from "./ui/drawer";
 import { mountStudio } from "./ui/studio";
 import { mountLanding } from "./ui/landing";
+import { Legend } from "./ui/legend";
 
 const TIMELINE_START = new Date("2015-01-01T00:00:00Z");
 
-function mountStage(): { canvasEl: HTMLElement; drawerEl: HTMLElement; scrubberEl: HTMLElement; topbar: HTMLElement } {
+function mountStage(): {
+  canvasEl: HTMLElement;
+  drawerEl: HTMLElement;
+  scrubberEl: HTMLElement;
+  topbar: HTMLElement;
+  legendSlot: HTMLElement;
+} {
   const root = document.getElementById("app")!;
   root.innerHTML = `
     <div class="stage" role="application" aria-label="AI sentiment sonification stage">
       <header class="topbar">
         <span class="title">Listening to the Machine</span>
+        <div class="legend-slot"></div>
         <div class="modes" role="group" aria-label="Playback mode">
           <button data-mode="live">Live</button>
           <button data-mode="retro">Retrospective</button>
@@ -25,6 +33,7 @@ function mountStage(): { canvasEl: HTMLElement; drawerEl: HTMLElement; scrubberE
         <div class="controls">
           <button class="chip" id="playBtn" aria-label="Pause audio">Pause</button>
           <button class="chip" id="studioBtn" aria-label="Toggle studio panel" title="Press S">Studio</button>
+          <button class="chip sources-toggle" id="sourcesBtn" aria-label="Open sources panel" aria-expanded="false">In this window</button>
         </div>
       </section>
       <aside class="drawer" aria-label="Source drawer"></aside>
@@ -36,11 +45,12 @@ function mountStage(): { canvasEl: HTMLElement; drawerEl: HTMLElement; scrubberE
     drawerEl: root.querySelector(".drawer") as HTMLElement,
     scrubberEl: root.querySelector(".scrubber") as HTMLElement,
     topbar: root.querySelector(".topbar") as HTMLElement,
+    legendSlot: root.querySelector(".legend-slot") as HTMLElement,
   };
 }
 
 async function begin(): Promise<void> {
-  const { canvasEl, drawerEl, scrubberEl, topbar } = mountStage();
+  const { canvasEl, drawerEl, scrubberEl, topbar, legendSlot } = mountStage();
   const engine = new AudioEngine();
   await engine.start();
   mountStudio(engine);
@@ -52,6 +62,11 @@ async function begin(): Promise<void> {
     start: TIMELINE_START,
     end: now,
     onWindow: (from, to) => refresh(from, to),
+  });
+
+  // Category legend (marginalia): solos / mutes the three voices visually & audibly.
+  const legend = new Legend(legendSlot, (state) => {
+    engine.setCategoryVisibility(state);
   });
 
   const [from0, to0] = scrubber.getWindow();
@@ -68,6 +83,28 @@ async function begin(): Promise<void> {
   });
   (document.getElementById("studioBtn") as HTMLButtonElement).addEventListener("click", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "s" }));
+  });
+
+  // Sources drawer toggle (tablet / mobile). On desktop the drawer is a
+  // permanent side column and the button itself is hidden via CSS.
+  const sourcesBtn = document.getElementById("sourcesBtn") as HTMLButtonElement;
+  sourcesBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = document.body.classList.toggle("drawer-open");
+    sourcesBtn.setAttribute("aria-expanded", String(open));
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.body.classList.contains("drawer-open")) {
+      document.body.classList.remove("drawer-open");
+      sourcesBtn.setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("click", (e) => {
+    if (!document.body.classList.contains("drawer-open")) return;
+    const target = e.target as HTMLElement;
+    if (target.closest(".drawer") || target.closest(".sources-toggle")) return;
+    document.body.classList.remove("drawer-open");
+    sourcesBtn.setAttribute("aria-expanded", "false");
   });
 
   topbar.querySelectorAll<HTMLButtonElement>(".modes button").forEach(btn => {
@@ -99,6 +136,7 @@ async function begin(): Promise<void> {
       constellation.render(win.exemplars);
       renderDrawer(drawerEl, win.exemplars);
       scrubber.draw(win.aggregates);
+      legend.setWindow(win.aggregates);
       engine.updateFromWindow(win.aggregates, win.exemplars);
     } catch (err) {
       console.warn("refresh failed", err);
