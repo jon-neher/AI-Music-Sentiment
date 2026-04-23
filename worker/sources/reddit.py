@@ -28,7 +28,12 @@ _OAUTH_URL = "https://www.reddit.com/api/v1/access_token"
 _API_BASE = "https://oauth.reddit.com"
 _BUSINESS_SUBS = {"economics", "business"}
 _LISTING_PAGE_CAP = 10
-_COMMENT_LIMIT = 50
+# Top-20 comments preserve ~95%% of the reaction-sentiment signal at 40%% of
+# the comment-scoring cost versus the prior limit of 50.
+_COMMENT_LIMIT = 20
+# When a listing page returns no new submissions for this many pages in a row,
+# stop paginating -- the rest of the page history is already ingested.
+_KNOWN_PAGE_STREAK = 2
 
 
 def _matches(text: str, keywords: list[str]) -> bool:
@@ -121,11 +126,34 @@ def _iter_comments(
         )
 
 
+def _known_submission_ids(ids: list[str]) -> set[str]:
+    """Return the subset of submission post-IDs already stored in `posts`.
+
+    Used to skip comment fetches for submissions we've seen before. Degrades
+    gracefully: on any DB error we return an empty set, which falls back to
+    the prior behavior (always fetch comments) rather than missing data.
+    """
+    if not ids:
+        return set()
+    try:
+        from sqlalchemy import select
+        from ..db import Post, SessionLocal
+        with SessionLocal() as s:
+            return set(s.scalars(
+                select(Post.__table__.c.id).where(Post.__table__.c.id.in_(ids))
+            ).all())
+    except Exception:
+        log.warning("Reddit: known-id DB probe failed; falling back to full fetch",
+                    exc_info=True)
+        return set()
+
+
 def _walk_sub(
     client: httpx.Client, sub: str, keyword_filter: bool,
     keywords: list[str], from_ts: int, to_ts: int,
 ) -> Iterable[RawPost]:
     after: Optional[str] = None
+    all_known_streak = 0
     for _ in range(_LISTING_PAGE_CAP):
         params: dict = {"limit": 100}
         if after:
@@ -141,6 +169,7 @@ def _walk_sub(
         if not children:
             return
         crossed_window = False
+        page_posts: list[tuple[dict, RawPost]] = []
         for ch in children:
             d = ch.get("data") or {}
             created = int(d.get("created_utc") or 0)
@@ -156,10 +185,32 @@ def _walk_sub(
             post = _emit_submission(d, sub)
             if post is None:
                 continue
+            page_posts.append((d, post))
+
+        # Batch-check DB for which submissions we already have. Skip the
+        # comment fetch for known ones (the submission is still yielded so
+        # _upsert_posts can refresh `reach`).
+        known = _known_submission_ids([p.id for _, p in page_posts])
+        for d, post in page_posts:
             yield post
+            if post.id in known:
+                continue
             sub_id = d.get("id")
             if sub_id:
                 yield from _iter_comments(client, sub_id, post.title, sub, from_ts, to_ts)
+
+        # Listing short-circuit: if consecutive pages yield only
+        # already-known submissions we've paginated into settled territory
+        # and further pages would be pure re-fetch cost.
+        page_has_new = any(p.id not in known for _, p in page_posts)
+        if page_posts and not page_has_new:
+            all_known_streak += 1
+            if all_known_streak >= _KNOWN_PAGE_STREAK:
+                log.debug("r/%s: paginated into known territory; stopping.", sub)
+                return
+        else:
+            all_known_streak = 0
+
         after = (data.get("data") or {}).get("after")
         if not after or crossed_window:
             return
