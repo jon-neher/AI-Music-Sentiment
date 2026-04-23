@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Iterable, List
 
@@ -127,24 +128,33 @@ def run_window(from_dt: datetime, to_dt: datetime) -> dict:
     ]
 
     totals: dict = {name: 0 for name, _ in sources}
-    batch: List[RawPost] = []
 
-    def flush() -> None:
-        if batch:
-            _upsert_posts(batch)
-            batch.clear()
-
-    for name, factory in sources:
+    def _collect(name: str, factory: Callable[[], Iterable[RawPost]]) -> tuple[str, list[RawPost]]:
+        """Run a source to completion into a list. Per-source try/except so
+        one flaky source can't abort the whole ingest."""
+        collected: list[RawPost] = []
         try:
             for post in factory():
-                batch.append(post)
-                totals[name] += 1
-                if len(batch) >= 64:
-                    flush()
-            flush()
+                collected.append(post)
         except Exception:
             log.exception("Source %s aborted; continuing with remaining sources.", name)
-            flush()
+        return name, collected
+
+    # Fetch all sources in parallel. Work is network-bound (httpx + feedparser);
+    # threads sidestep the GIL well enough for this IO profile. Keep worker
+    # count modest to avoid spamming remote endpoints from a single pod.
+    all_posts: list[RawPost] = []
+    with ThreadPoolExecutor(max_workers=min(8, len(sources))) as pool:
+        futs = [pool.submit(_collect, name, factory) for name, factory in sources]
+        for fut in as_completed(futs):
+            name, posts = fut.result()
+            totals[name] = len(posts)
+            all_posts.extend(posts)
+
+    # Score + upsert sequentially in the existing batch size. Scoring holds
+    # the torch pipeline; parallelism there would contend on the model.
+    for i in range(0, len(all_posts), 64):
+        _upsert_posts(all_posts[i:i + 64])
 
     log.info("Ingest complete: %s", totals)
     return totals
