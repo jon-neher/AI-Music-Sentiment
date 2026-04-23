@@ -13,4 +13,4 @@ COPY . /app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "::", "--port", "8000"]
+CMD ["python", "-u", "run.py"]
