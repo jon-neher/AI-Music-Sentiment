@@ -1,4 +1,14 @@
-"""APScheduler-based always-on worker. Runs hourly ingest + nightly rollup."""
+"""APScheduler-based always-on worker.
+
+Cadence:
+  - every 4h: ingest (5h window, 1h overlap) + light same-day rollup so the
+    constellation reflects the current day as it unfolds
+  - nightly: full 3-day rollup to settle late-arriving posts and reach churn
+
+Hourly was overkill for this project -- the sonification reads daily
+aggregates, which compress sub-daily variance anyway. 4h keeps <4h latency
+from breaking news to constellation while cutting worker load ~75%%.
+"""
 from __future__ import annotations
 
 import logging
@@ -17,8 +27,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("worker.schedule")
 
 # Tolerance for the tail-gap check: if the newest post is within this window of
-# "now", the hourly cron is expected to fill the remainder; don't step on it.
-_TAIL_TOLERANCE = timedelta(hours=2)
+# "now", the scheduled cron is expected to fill the remainder; don't step on it.
+_TAIL_TOLERANCE = timedelta(hours=5)
 # Tolerance for the head-gap check: if the oldest post is within this window of
 # the configured backfill_start, treat the head as fully covered.
 _HEAD_TOLERANCE = timedelta(days=1)
@@ -76,10 +86,10 @@ def main() -> None:
     init_db()
     log.info("Worker starting; running an initial ingest.")
     try:
-        # 2h catch-up window: any longer overlaps the hourly cron's own
-        # window and wastes DB probes. The backfill planner below fills
-        # gaps larger than _TAIL_TOLERANCE.
-        run_recent(hours=2)
+        # Startup catch-up matches the scheduled ingest window below so the
+        # first cron pass isn't re-doing work. _plan_backfill_windows
+        # handles any gap larger than _TAIL_TOLERANCE.
+        run_recent(hours=5)
         rollup_recent(days=2)
     except Exception:
         log.exception("Initial ingest failed")
@@ -87,8 +97,22 @@ def main() -> None:
     _maybe_backfill()
 
     sched = BlockingScheduler(timezone="UTC")
-    sched.add_job(lambda: run_recent(hours=2), "cron", minute=7, id="hourly_ingest")
-    sched.add_job(lambda: rollup_recent(days=3), "cron", hour=3, minute=0, id="nightly_rollup")
+    # Every 4 hours at :07 -- ingest a 5h window (1h overlap for safety).
+    sched.add_job(
+        lambda: run_recent(hours=5),
+        "cron", hour="*/4", minute=7, id="ingest",
+    )
+    # Same-day rollup immediately after each ingest so the constellation
+    # reflects today's sentiment continuously rather than waiting for 3 AM.
+    sched.add_job(
+        lambda: rollup_recent(days=1),
+        "cron", hour="*/4", minute=17, id="today_rollup",
+    )
+    # Nightly 3-day rollup settles late-arriving posts and reach churn.
+    sched.add_job(
+        lambda: rollup_recent(days=3),
+        "cron", hour=3, minute=0, id="nightly_rollup",
+    )
     log.info("Scheduler armed.")
     sched.start()
 
