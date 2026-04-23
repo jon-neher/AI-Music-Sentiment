@@ -71,7 +71,6 @@ export class Scrubber {
     const drag = d3.drag<SVGSVGElement, unknown>()
       .on("start drag", (event) => {
         const mx = event.x;
-        const cx = (x(this.windowFrom).valueOf() + x(this.windowTo).valueOf()) / 2;
         const w = x(this.windowTo).valueOf() - x(this.windowFrom).valueOf();
         const newCenter = Math.max(16 + w / 2, Math.min(width - 16 - w / 2, mx));
         this.windowFrom = x.invert(newCenter - w / 2);
