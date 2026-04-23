@@ -33,6 +33,7 @@ function mountStage(): {
         <div class="controls">
           <button class="chip" id="playBtn" aria-label="Pause audio">Pause</button>
           <button class="chip" id="studioBtn" aria-label="Toggle studio panel" title="Press S">Studio</button>
+          <button class="chip axes-toggle" id="axesBtn" aria-label="Toggle axes" title="Show axes" aria-pressed="false">?</button>
           <button class="chip sources-toggle" id="sourcesBtn" aria-label="Open sources panel" aria-expanded="false">In this window</button>
         </div>
       </section>
@@ -83,6 +84,18 @@ async function begin(): Promise<void> {
   });
   (document.getElementById("studioBtn") as HTMLButtonElement).addEventListener("click", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "s" }));
+  });
+
+  // Axes toggle -- reveals the opt-in tick/label grid on top of the always-on
+  // marginalia. Kept as a "?" chip rather than a labeled button so it reads
+  // as a help affordance and stays out of the way of the aesthetic.
+  const axesBtn = document.getElementById("axesBtn") as HTMLButtonElement;
+  axesBtn.addEventListener("click", () => {
+    const on = !constellation.getAxes();
+    constellation.setAxes(on);
+    axesBtn.setAttribute("aria-pressed", String(on));
+    axesBtn.classList.toggle("is-on", on);
+    axesBtn.setAttribute("title", on ? "Hide axes" : "Show axes");
   });
 
   // Sources drawer toggle (tablet / mobile). On desktop the drawer is a

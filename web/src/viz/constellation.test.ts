@@ -165,5 +165,85 @@ describe("Constellation", () => {
 
     expect(() => c.render([])).not.toThrow();
     expect(canvas.querySelectorAll("path.dot").length).toBe(0);
+    // Margins cleared when there's nothing to orient.
+    expect(canvas.querySelector("g.margins")?.children.length ?? 0).toBe(0);
+  });
+
+  it("renders hopeful/fearful margin labels, a neutral line, and date anchors", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    c.render([
+      makePost("a", { published_at: new Date("2025-06-01T00:00:00Z").toISOString() }),
+      makePost("b", { published_at: new Date("2025-06-10T00:00:00Z").toISOString() }),
+    ]);
+
+    const margins = canvas.querySelector("g.margins")!;
+    const annots = Array.from(margins.querySelectorAll("text.axis-annot")).map(t => t.textContent);
+    expect(annots).toContain("↑ hopeful");
+    expect(annots).toContain("fearful ↓");
+    expect(annots).toContain("neutral");
+    // Date anchors use the pre-configured d3.timeFormat("%b %-d").
+    expect(annots.some(a => a && /Jun\s\d+/.test(a))).toBe(true);
+
+    // Neutral line exists and spans the plot width.
+    const neutral = margins.querySelector("line.neutral-line") as SVGLineElement | null;
+    expect(neutral).not.toBeNull();
+    expect(Number(neutral!.getAttribute("x1"))).toBe(40);
+
+    // Size key — three dots + label.
+    const sizeKey = margins.querySelector("g.size-key")!;
+    expect(sizeKey.querySelectorAll("circle").length).toBe(3);
+    expect(sizeKey.querySelector("text")?.textContent).toBe("reach");
+  });
+
+  it("tooltip on each dot includes sentiment and reach", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    c.render([makePost("a", { sentiment: -0.42, reach: 1300 })]);
+
+    const title = canvas.querySelector("path.dot title")?.textContent ?? "";
+    expect(title).toMatch(/sent\s+-0\.42/);
+    expect(title).toMatch(/reach\s+1\.3k/);
+  });
+
+  it("ghost axes hidden by default, revealed on setAxes(true)", () => {
+    const c = new Constellation(canvas);
+    const svg = canvas.querySelector("svg.constellation")!;
+    setBox(svg, 800, 600);
+    c.render([makePost("a"), makePost("b", { published_at: new Date("2025-07-01T00:00:00Z").toISOString() })]);
+
+    const axesLayer = canvas.querySelector("g.ghost-axes") as SVGGElement;
+    expect(axesLayer).not.toBeNull();
+    expect(axesLayer.getAttribute("display")).toBe("none");
+    // No children rendered while hidden.
+    expect(axesLayer.children.length).toBe(0);
+    expect(c.getAxes()).toBe(false);
+
+    c.setAxes(true);
+    expect(c.getAxes()).toBe(true);
+    expect(axesLayer.getAttribute("display")).not.toBe("none");
+    // Ticks and caption populated.
+    expect(axesLayer.querySelectorAll("text").length).toBeGreaterThan(3);
+    const captionTexts = Array.from(axesLayer.querySelectorAll("text")).map(t => t.textContent ?? "");
+    expect(captionTexts.some(t => /horizontal = time/.test(t))).toBe(true);
+    // Sentiment tick labels (+1.0, +0.5, 0.0, -0.5, -1.0) should all be present.
+    for (const label of ["+1.0", "+0.5", "0.0", "-0.5", "-1.0"]) {
+      expect(captionTexts).toContain(label);
+    }
+
+    c.setAxes(false);
+    expect(axesLayer.getAttribute("display")).toBe("none");
+    expect(axesLayer.children.length).toBe(0);
+  });
+
+  it("does not add duplicate layers when the constellation is re-constructed", () => {
+    new Constellation(canvas);
+    new Constellation(canvas);
+    // One of each layer, no matter how many constructors ran.
+    expect(canvas.querySelectorAll("g.dots").length).toBe(1);
+    expect(canvas.querySelectorAll("g.margins").length).toBe(1);
+    expect(canvas.querySelectorAll("g.ghost-axes").length).toBe(1);
   });
 });
