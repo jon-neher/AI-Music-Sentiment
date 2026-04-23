@@ -97,6 +97,7 @@ export class Constellation {
 
     const enter = sel.enter().append("path")
       .attr("class", "dot")
+      .attr("data-cat", d => d.category)
       .attr("transform", d => `translate(${x(new Date(d.published_at))},${y(d.sentiment)})`)
       .attr("d", d => shapePath(d.category, r(d.reach || 0)))
       .attr("fill", d => COLORS[d.category])

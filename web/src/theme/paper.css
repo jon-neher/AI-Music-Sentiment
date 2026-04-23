@@ -11,7 +11,33 @@
   --font-hand: "Caveat", "Homemade Apple", cursive;
   --font-serif: "EB Garamond", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Layout tokens */
+  --topbar-pad-y: clamp(8px, 1.4vh, 16px);
+  --topbar-pad-x: clamp(12px, 2.5vw, 20px);
+  --scrubber-h: clamp(56px, 9svh, 88px);
+  --drawer-w: min(360px, 30vw);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
+
+/* Per-category opacity channels. The Legend component writes to
+   body[data-solo] / body[data-muted]; these selectors convert that state into
+   CSS custom properties consumed by constellation dots, scrubber lines, and
+   the legend itself. */
+body {
+  --opacity-public: 1;
+  --opacity-business: 1;
+  --opacity-science: 1;
+}
+body[data-solo="public"]    { --opacity-business: 0.15; --opacity-science: 0.15; }
+body[data-solo="business"]  { --opacity-public: 0.15;   --opacity-science: 0.15; }
+body[data-solo="science"]   { --opacity-public: 0.15;   --opacity-business: 0.15; }
+body[data-muted~="public"]   { --opacity-public: 0.15;   }
+body[data-muted~="business"] { --opacity-business: 0.15; }
+body[data-muted~="science"]  { --opacity-science: 0.15;  }
 
 * { box-sizing: border-box; }
 
@@ -22,6 +48,7 @@ html, body, #app {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-serif);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -30,28 +57,37 @@ body {
     radial-gradient(ellipse at 100% 100%, rgba(0,0,0,0.05), transparent 60%),
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.1  0 0 0 0 0.09  0 0 0 0 0.07  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.9'/></svg>");
   background-size: auto, auto, 220px 220px;
+  overscroll-behavior: none;
 }
 
 h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.01em; }
 
+/* ------------------------------------------------------------------ */
+/* Landing                                                            */
+/* ------------------------------------------------------------------ */
 .landing {
   position: fixed; inset: 0;
   display: grid; place-items: center;
   background: var(--paper);
   z-index: 10;
+  padding: clamp(16px, 4vw, 48px);
+  padding-top: calc(clamp(16px, 4vw, 48px) + var(--safe-top));
+  padding-bottom: calc(clamp(16px, 4vw, 48px) + var(--safe-bottom));
 }
 .landing .card {
   max-width: 640px;
-  padding: 48px 56px;
+  padding: clamp(24px, 5vw, 56px);
   text-align: center;
 }
-.landing h1 { font-size: clamp(42px, 6vw, 72px); margin: 0 0 0.4em; }
-.landing p  { font-size: clamp(16px, 1.8vw, 20px); line-height: 1.55; color: var(--ink-soft); }
+.landing h1 { font-size: clamp(36px, 7vw, 72px); margin: 0 0 0.4em; line-height: 1.05; }
+.landing p  { font-size: clamp(15px, 1.8vw, 20px); line-height: 1.55; color: var(--ink-soft); }
 .landing button {
   margin-top: 28px;
   font-family: var(--font-hand);
-  font-size: 26px;
+  font-size: clamp(20px, 2.5vw, 26px);
   padding: 10px 28px;
+  min-height: 44px;
+  min-width: 120px;
   background: transparent;
   color: var(--ink);
   border: 2px solid var(--ink);
@@ -61,44 +97,219 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 }
 .landing button:hover { transform: translateY(-1px); }
 
+/* ------------------------------------------------------------------ */
+/* Stage                                                              */
+/* ------------------------------------------------------------------ */
 .stage {
   position: fixed; inset: 0;
+  height: 100vh;
+  height: 100svh;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  grid-template-columns: 1fr min(360px, 30vw);
+  grid-template-rows: auto minmax(280px, 1fr) auto;
+  grid-template-columns: 1fr var(--drawer-w);
   grid-template-areas:
     "top top"
     "canvas drawer"
     "scrubber scrubber";
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
 }
-.topbar { grid-area: top; display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
-.topbar .title { font-family: var(--font-hand); font-size: 28px; }
+
+/* ------------------------------------------------------------------ */
+/* Topbar: title | legend (marginalia) | modes                        */
+/* ------------------------------------------------------------------ */
+.topbar {
+  grid-area: top;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: clamp(12px, 2.5vw, 28px);
+  row-gap: 8px;
+  padding: calc(var(--topbar-pad-y) + var(--safe-top)) var(--topbar-pad-x) var(--topbar-pad-y);
+}
+.topbar .title {
+  font-family: var(--font-hand);
+  font-size: clamp(22px, 3vw, 28px);
+  white-space: nowrap;
+}
+.topbar .legend-slot {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.topbar .modes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .topbar .modes button {
-  font-family: var(--font-hand); font-size: 18px;
-  background: transparent; border: 1.5px solid var(--ink); color: var(--ink);
-  padding: 4px 10px; margin-left: 6px; border-radius: 2px; cursor: pointer;
+  font-family: var(--font-hand);
+  font-size: clamp(13px, 1.4vw, 17px);
+  background: transparent;
+  border: 1px solid rgba(26,23,19,0.6);
+  color: var(--ink-soft);
+  padding: 2px 10px;
+  min-height: 28px;
+  border-radius: 2px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
-.topbar .modes button.active { background: var(--ink); color: var(--paper); }
+.topbar .modes button:hover { color: var(--ink); border-color: var(--ink); }
+.topbar .modes button.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
 
-.canvas { grid-area: canvas; position: relative; overflow: hidden; }
-.canvas svg { width: 100%; height: 100%; }
+/* ------------------------------------------------------------------ */
+/* Legend (marginalia, acts as the primary solo/mute surface)          */
+/* ------------------------------------------------------------------ */
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.8vw, 20px);
+  flex-wrap: wrap;
+}
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 3px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  color: var(--ink);
+  font-family: var(--font-hand);
+  font-size: clamp(15px, 1.7vw, 19px);
+  line-height: 1.1;
+  cursor: pointer;
+  transition: opacity 220ms ease, border-color 180ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.legend-chip:focus-visible { outline: 1px dashed var(--ink); outline-offset: 2px; }
+.legend-chip[data-active="false"] { opacity: 0.4; }
+.legend-chip.is-solo  { border-bottom: 1px solid var(--ink); }
+.legend-chip.is-muted .legend-label { text-decoration: line-through; text-decoration-thickness: 1px; }
+.legend-shape { display: inline-flex; align-items: center; }
+.legend-label { letter-spacing: 0.01em; }
+.legend-trend {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+}
+.legend-spark { width: 34px; height: 10px; display: inline-block; }
 
-.drawer { grid-area: drawer; border-left: 1px dashed rgba(0,0,0,0.2); padding: 16px; overflow-y: auto; }
+/* ------------------------------------------------------------------ */
+/* Canvas                                                             */
+/* ------------------------------------------------------------------ */
+.canvas {
+  grid-area: canvas;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+}
+.canvas svg.constellation { width: 100%; height: 100%; display: block; }
+
+/* Per-category dot opacity — bound to legend state via CSS vars. */
+.canvas svg.constellation path.dot[data-cat="public"]   { opacity: var(--opacity-public, 1); }
+.canvas svg.constellation path.dot[data-cat="business"] { opacity: var(--opacity-business, 1); }
+.canvas svg.constellation path.dot[data-cat="science"]  { opacity: var(--opacity-science, 1); }
+.canvas svg.constellation path.dot { transition: opacity 260ms ease; }
+
+/* ------------------------------------------------------------------ */
+/* Floating stage controls (top-right of canvas, hand-lettered)        */
+/* ------------------------------------------------------------------ */
+.canvas .controls {
+  position: absolute;
+  top: 12px;
+  right: calc(12px + var(--safe-right));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 6;
+}
+.canvas .controls .chip {
+  font-family: var(--font-hand);
+  font-size: clamp(15px, 1.6vw, 18px);
+  padding: 2px 10px;
+  min-height: 28px;
+  border: 1px solid rgba(26,23,19,0.55);
+  border-radius: 2px;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--paper) 85%, transparent);
+  color: var(--ink);
+  line-height: 1.2;
+  backdrop-filter: blur(1.5px);
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.canvas .controls .chip:hover { border-color: var(--ink); }
+
+/* "In this window" — hand-lettered link, not a chip */
+.canvas .controls .sources-toggle {
+  display: none; /* revealed at ≤1199px via media query */
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink-soft);
+  border-radius: 0;
+  padding: 2px 2px 1px;
+  min-height: 26px;
+  font-size: clamp(15px, 1.7vw, 18px);
+}
+.canvas .controls .sources-toggle[aria-expanded="true"] {
+  border-bottom: 2px solid var(--ink);
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ */
+/* Drawer (desktop: side column; tablet/phone: torn-page sheet)       */
+/* ------------------------------------------------------------------ */
+.drawer {
+  grid-area: drawer;
+  border-left: 1px dashed rgba(0,0,0,0.2);
+  padding: 16px;
+  overflow-y: auto;
+  min-height: 0;
+}
 .drawer h2 { font-size: 22px; margin: 0 0 12px; }
-.drawer .row { display: flex; gap: 8px; padding: 8px 4px; border-bottom: 1px dotted rgba(0,0,0,0.15); font-size: 14px; }
+.drawer .row {
+  display: flex; gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px dotted rgba(0,0,0,0.15);
+  font-size: 14px;
+}
 .drawer .row a { color: var(--ink); text-decoration: none; }
 .drawer .row a:hover { text-decoration: underline; }
 .drawer .shape { flex: 0 0 14px; margin-top: 3px; }
 
-.scrubber { grid-area: scrubber; height: 80px; border-top: 1px dashed rgba(0,0,0,0.2); padding: 8px 16px; position: relative; }
-.scrubber svg { width: 100%; height: 64px; }
+/* ------------------------------------------------------------------ */
+/* Scrubber                                                           */
+/* ------------------------------------------------------------------ */
+.scrubber {
+  grid-area: scrubber;
+  height: var(--scrubber-h);
+  border-top: 1px dashed rgba(0,0,0,0.2);
+  padding: 8px 16px calc(8px + var(--safe-bottom));
+  position: relative;
+}
+.scrubber svg { width: 100%; height: 100%; display: block; }
 
-.controls { position: absolute; left: 12px; top: 12px; display: flex; gap: 10px; align-items: center; }
-.controls .chip { font-family: var(--font-hand); font-size: 18px; padding: 2px 10px; border: 1.5px solid var(--ink); border-radius: 2px; cursor: pointer; background: transparent; color: var(--ink); }
+/* Per-category line opacity — same vars as constellation. */
+.scrubber svg path.cat-line[data-cat="public"]   { opacity: var(--opacity-public, 1); transition: opacity 260ms ease; }
+.scrubber svg path.cat-line[data-cat="business"] { opacity: var(--opacity-business, 1); transition: opacity 260ms ease; }
+.scrubber svg path.cat-line[data-cat="science"]  { opacity: var(--opacity-science, 1); transition: opacity 260ms ease; }
 
+/* ------------------------------------------------------------------ */
+/* Quote cards                                                        */
+/* ------------------------------------------------------------------ */
 .quotecard {
   position: absolute;
-  bottom: 96px; left: 24px;
+  bottom: 24px;
+  left: 24px;
   max-width: 320px;
   background: var(--paper);
   border: 1px solid rgba(0,0,0,0.25);
@@ -110,16 +321,31 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   transform: rotate(-1.2deg);
   animation: quoteFade 8s ease both;
   cursor: pointer;
+  z-index: 5;
+  text-decoration: none;
+  color: var(--ink);
 }
-.quotecard small { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); margin-top: 6px; letter-spacing: 0.04em; }
+.quotecard small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  letter-spacing: 0.04em;
+}
 @keyframes quoteFade {
-  0% { opacity: 0; transform: rotate(-1.2deg) translateY(8px); }
-  10%, 85% { opacity: 1; transform: rotate(-1.2deg) translateY(0); }
-  100% { opacity: 0; transform: rotate(-1.2deg) translateY(-8px); }
+  0%        { opacity: 0; transform: rotate(-1.2deg) translateY(8px); }
+  10%, 85%  { opacity: 1; transform: rotate(-1.2deg) translateY(0); }
+  100%      { opacity: 0; transform: rotate(-1.2deg) translateY(-8px); }
 }
 
+/* ------------------------------------------------------------------ */
+/* Studio panel                                                       */
+/* ------------------------------------------------------------------ */
 .studio {
-  position: fixed; right: 24px; bottom: 100px;
+  position: fixed;
+  right: calc(24px + var(--safe-right));
+  bottom: calc(var(--scrubber-h) + 16px + var(--safe-bottom));
   width: 280px;
   background: var(--paper);
   border: 1px solid var(--ink);
@@ -132,13 +358,130 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 .studio label { font-size: 13px; display: block; margin: 8px 0 2px; }
 .studio input[type="range"] { width: 100%; }
 .studio .presets { display: flex; flex-wrap: wrap; gap: 6px; }
-.studio .presets button { font-family: var(--font-hand); font-size: 16px; padding: 2px 8px; background: transparent; border: 1px solid var(--ink); border-radius: 2px; cursor: pointer; }
-
-@media (max-width: 1199px) {
-  .stage { grid-template-columns: 1fr; grid-template-areas: "top" "canvas" "scrubber"; }
-  .drawer { display: none; }
+.studio .presets button {
+  font-family: var(--font-hand);
+  font-size: 16px;
+  padding: 4px 10px;
+  min-height: 32px;
+  background: transparent;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  cursor: pointer;
 }
+
+/* ------------------------------------------------------------------ */
+/* Breakpoint: tablet & small laptop (≤1199px)                        */
+/*   - Drawer becomes a torn-page sheet, no scrim                     */
+/*   - Show "In this window" link in the floating controls            */
+/* ------------------------------------------------------------------ */
+@media (max-width: 1199px) {
+  .stage {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "top"
+      "canvas"
+      "scrubber";
+  }
+  .drawer {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0;
+    height: min(58svh, 460px);
+    padding: 18px 20px calc(16px + var(--safe-bottom));
+    border-left: none;
+    border-top: 1px solid var(--ink);
+    background: var(--paper);
+    box-shadow: 0 -10px 28px rgba(0,0,0,0.10);
+    transform: translateY(102%) rotate(-0.35deg);
+    transform-origin: left bottom;
+    transition: transform 280ms ease;
+    z-index: 30;
+    visibility: hidden;
+    /* torn-page top edge */
+    background-image:
+      linear-gradient(var(--paper), var(--paper)),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='6' viewBox='0 0 80 6'><path d='M0 4 Q4 1 8 4 T16 4 T24 4 T32 4 T40 4 T48 4 T56 4 T64 4 T72 4 T80 4 V6 H0 Z' fill='%23f4efe4' stroke='%231a1713' stroke-opacity='0.45' stroke-width='0.6'/></svg>");
+    background-repeat: no-repeat, repeat-x;
+    background-position: 0 0, 0 0;
+    background-size: 100% 100%, 80px 6px;
+  }
+  body.drawer-open .drawer {
+    transform: translateY(0) rotate(-0.35deg);
+    visibility: visible;
+  }
+  .canvas .controls .sources-toggle { display: inline-flex; align-items: center; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Breakpoint: phone-ish (≤900px)                                     */
+/*   - Title on its own row                                           */
+/*   - Modes scaled down further                                      */
+/*   - Studio becomes a full-width bottom sheet                       */
+/*   - Quote cards pin to a safe slot above the scrubber (max 2)      */
+/* ------------------------------------------------------------------ */
+@media (max-width: 900px) {
+  .topbar { row-gap: 8px; }
+  /* Title is the loudest on its own line; legend and modes share the next
+     row when there's space and wrap gracefully when there isn't. */
+  .topbar .title { flex: 1 1 100%; font-size: clamp(22px, 6vw, 28px); }
+  .topbar .legend-slot { flex: 1 1 auto; min-width: 0; }
+  .topbar .modes { flex: 0 0 auto; }
+  .topbar .modes button {
+    font-size: 13px;
+    padding: 2px 8px;
+    min-height: 26px;
+  }
+  .legend { justify-content: flex-start; gap: 14px; }
+  .legend-chip { font-size: 17px; }
+  .legend-spark { width: 30px; }
+
+  .canvas .controls { top: 10px; right: calc(10px + var(--safe-right)); gap: 6px; }
+  .canvas .controls .chip { font-size: 15px; padding: 2px 8px; min-height: 28px; }
+
+  .quotecard {
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--scrubber-h) + 12px + var(--quote-offset, 0) * 74px);
+    max-width: none;
+    font-size: 17px;
+    padding: 10px 12px;
+    animation-duration: var(--quote-lifetime, 8s);
+  }
+
+  .studio {
+    left: 0; right: 0; bottom: 0;
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: 0 -8px 28px rgba(0,0,0,0.14);
+    padding: 14px 18px calc(14px + var(--safe-bottom));
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Breakpoint: small phone portrait (≤640px)                          */
+/* ------------------------------------------------------------------ */
+@media (max-width: 640px) {
+  .stage {
+    grid-template-rows: auto minmax(220px, 1fr) auto;
+  }
+  .drawer { height: min(68svh, 520px); }
+
+  .landing .card { padding: clamp(20px, 6vw, 36px); }
+  .landing h1 { font-size: clamp(30px, 9vw, 48px); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion                                                     */
+/* ------------------------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   .quotecard { animation: none; }
   .canvas .drift { animation: none !important; }
+  .drawer { transition: none; }
+  .landing button { transition: none; }
+  .canvas svg.constellation path.dot,
+  .scrubber svg path.cat-line,
+  .legend-chip { transition: none; }
 }
