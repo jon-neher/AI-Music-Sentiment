@@ -24,6 +24,22 @@ log = logging.getLogger(__name__)
 _URL = "https://newsapi.org/v2/everything"
 _MAX_DAYS = 30
 _QUERY = '("artificial intelligence" OR "machine learning" OR LLM OR "large language model" OR "generative AI")'
+# Outlets we ingest directly via dedicated RSS sources; excluding them here
+# avoids double-counting the same article in aggregate volume metrics and
+# spares free-tier quota from being spent on dupes.
+_EXCLUDE_DOMAINS = ",".join([
+    "theverge.com",
+    "arstechnica.com",
+    "techcrunch.com",
+    "technologyreview.com",
+    "wired.com",
+    "404media.co",
+    "bloomberg.com",
+    "wsj.com",
+    "cnbc.com",
+    "economist.com",
+    "fastcompany.com",
+])
 
 
 def fetch(from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
@@ -49,6 +65,7 @@ def fetch(from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
             "pageSize": 100,
             "language": "en",
             "page": page,
+            "excludeDomains": _EXCLUDE_DOMAINS,
         }
         try:
             r = httpx.get(_URL, params=params, headers=headers, timeout=30.0, follow_redirects=True)
