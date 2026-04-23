@@ -28,6 +28,11 @@ _TAG_RE = re.compile(r"<[^>]+>")
 # this cutoff to avoid ~1,500 wasted fetches during a multi-year backfill.
 _HISTORICAL_CUTOFF = timedelta(days=7)
 
+# In-process cache of ETag / Last-Modified per feed URL. Lets us issue
+# conditional GETs that return 304 Not Modified when a feed is unchanged --
+# which is the common case on the hourly cron. Reset on every worker restart.
+_FEED_CACHE: dict[str, dict[str, str]] = {}
+
 
 @dataclass(frozen=True)
 class FeedConfig:
@@ -53,12 +58,37 @@ def fetch(cfg: FeedConfig, from_dt: datetime, to_dt: datetime) -> Iterable[RawPo
         log.debug("%s: window ends %s, older than RSS horizon; skipping.",
                   cfg.source, to_dt.date())
         return
+
+    headers = {"User-Agent": _UA}
+    cached = _FEED_CACHE.get(cfg.url, {})
+    if cached.get("etag"):
+        headers["If-None-Match"] = cached["etag"]
+    if cached.get("last_modified"):
+        headers["If-Modified-Since"] = cached["last_modified"]
+
     try:
-        r = httpx.get(cfg.url, headers={"User-Agent": _UA}, timeout=30.0, follow_redirects=True)
-        r.raise_for_status()
+        r = httpx.get(cfg.url, headers=headers, timeout=30.0, follow_redirects=True)
     except Exception:
         log.exception("%s RSS fetch failed", cfg.source)
         return
+    if r.status_code == 304:
+        log.debug("%s: 304 Not Modified; skipping parse", cfg.source)
+        return
+    try:
+        r.raise_for_status()
+    except Exception:
+        log.exception("%s RSS fetch failed (status %s)", cfg.source, r.status_code)
+        return
+
+    # Cache validators for the next run. Publishers vary in which they emit;
+    # we store whichever are present.
+    new_cache: dict[str, str] = {}
+    if etag := r.headers.get("etag"):
+        new_cache["etag"] = etag
+    if lm := r.headers.get("last-modified"):
+        new_cache["last_modified"] = lm
+    if new_cache:
+        _FEED_CACHE[cfg.url] = new_cache
 
     feed = feedparser.parse(r.text)
     keywords = get_settings().keywords if cfg.filter_ai else []
