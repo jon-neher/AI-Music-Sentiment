@@ -12,6 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:ios": "playwright test --project=iphone-12",
+    "test:e2e:android": "playwright test --project=pixel-5",
     "lint": "eslint ."
   },
   "dependencies": {
