@@ -73,7 +73,17 @@ jobs:
       - run: ruff check api worker
 
   e2e:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            project: pixel-5
+            install_browsers: npx playwright install --with-deps chromium
+          - os: macos-latest
+            project: iphone-12
+            install_browsers: npx playwright install webkit
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: web
@@ -86,9 +96,6 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - name: install playwright browsers
-        # iPhone 12 uses webkit; Pixel 5 uses chromium. Both are required so
-        # the mobile-constellation smoke can exercise iOS Safari layout --
-        # which is exactly where the bug this test guards against lived.
-        run: npx playwright install --with-deps chromium webkit
+        run: ${{ matrix.install_browsers }}
       - run: npm run build
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --project=${{ matrix.project }}
