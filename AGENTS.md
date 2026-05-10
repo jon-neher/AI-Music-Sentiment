@@ -113,6 +113,13 @@ the Vite/TS app.
 - New npm/pip dep -> update the matching lockfile/requirements; CI enforces
   install from lockfiles.
 
+## PR body formatting (gh CLI)
+
+- Prefer `--body-file <path>` when creating/editing PRs with `gh pr create`
+  or `gh pr edit`.
+- If passing `--body` inline, use real newlines (not escaped `\n` sequences),
+  otherwise GitHub will render the backslash characters literally.
+
 ## Out of scope / do not change without asking
 
 - Don't replace psycopg 3 with psycopg2 or asyncpg.

@@ -97,6 +97,26 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 }
 .landing button:hover { transform: translateY(-1px); }
 
+/* Make touch controls meet mobile accessibility hit targets without changing
+   desktop sizing. */
+@media (hover: none), (pointer: coarse) {
+  .landing button,
+  .topbar .modes button,
+  .legend-chip,
+  .canvas .controls .chip,
+  .canvas .controls .sources-toggle,
+  .studio .presets button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .topbar .modes button,
+  .canvas .controls .chip {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Stage                                                              */
 /* ------------------------------------------------------------------ */
