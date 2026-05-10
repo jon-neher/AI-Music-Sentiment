@@ -514,6 +514,30 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   .landing h1 { font-size: clamp(30px, 9vw, 48px); }
 }
 
+/* Re-assert coarse-pointer hit targets after breakpoint-specific overrides. */
+@media (hover: none), (pointer: coarse) {
+  .topbar .modes button,
+  .legend-chip,
+  .canvas .controls .chip,
+  .canvas .controls .sources-toggle {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .topbar .modes button,
+  .canvas .controls .chip,
+  .canvas .controls .sources-toggle {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .canvas .controls .axes-toggle {
+    min-width: 44px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Reduced motion                                                     */
 /* ------------------------------------------------------------------ */

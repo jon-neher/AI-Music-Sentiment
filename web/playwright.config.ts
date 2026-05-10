@@ -14,7 +14,8 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "iphone-12", use: { ...devices["iPhone 12"] } },
+    { name: "iphone-15-pro-max", use: { ...devices["iPhone 15 Pro Max"] } },
+    { name: "iphone-se-3rd-gen", use: { ...devices["iPhone SE (3rd gen)"] } },
     { name: "pixel-5", use: { ...devices["Pixel 5"] } },
   ],
   webServer: {

@@ -81,7 +81,10 @@ jobs:
             project: pixel-5
             install_browsers: npx playwright install --with-deps chromium
           - os: macos-latest
-            project: iphone-12
+            project: iphone-15-pro-max
+            install_browsers: npx playwright install webkit
+          - os: macos-latest
+            project: iphone-se-3rd-gen
             install_browsers: npx playwright install webkit
     runs-on: ${{ matrix.os }}
     defaults:
