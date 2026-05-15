@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, select
@@ -13,11 +14,11 @@ router = APIRouter()
 
 @router.get("/window", response_model=WindowResponse)
 def window(
-    from_: datetime = Query(..., alias="from"),
-    to: datetime = Query(...),
-    sources: str | None = Query(None, description="comma-separated category filter"),
-    limit_exemplars: int = Query(200, le=2000),
-    db: Session = Depends(get_db),
+    from_: Annotated[datetime, Query(alias="from")],
+    to: Annotated[datetime, Query()],
+    db: Annotated[Session, Depends(get_db)],
+    sources: Annotated[str | None, Query(description="comma-separated category filter")] = None,
+    limit_exemplars: Annotated[int, Query(le=2000)] = 200,
 ):
     cats = [c.strip() for c in sources.split(",")] if sources else None
 
@@ -47,7 +48,7 @@ def window(
 
 
 @router.get("/post/{post_id}", response_model=PostOut)
-def post_detail(post_id: str, db: Session = Depends(get_db)):
+def post_detail(post_id: str, db: Annotated[Session, Depends(get_db)]):
     p = db.get(Post, post_id)
     if not p:
         from fastapi import HTTPException
@@ -56,7 +57,7 @@ def post_detail(post_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/stats", response_model=StatsResponse)
-def stats(db: Session = Depends(get_db)):
+def stats(db: Annotated[Session, Depends(get_db)]):
     from sqlalchemy import func
     total = db.scalar(select(func.count(Post.id))) or 0
     first = db.scalar(select(func.min(Post.published_at)))
