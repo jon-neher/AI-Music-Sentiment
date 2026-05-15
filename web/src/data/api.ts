@@ -35,17 +35,34 @@ export interface WindowResponse {
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "/api";
 
+const cache = new Map<string, Promise<WindowResponse>>();
+
 export async function fetchWindow(from: Date, to: Date, sources?: Category[]): Promise<WindowResponse> {
   const params = new URLSearchParams({
     from: from.toISOString(),
     to: to.toISOString(),
   });
   if (sources && sources.length) params.set("sources", sources.join(","));
+  
+  const key = params.toString();
+  if (cache.has(key)) return cache.get(key)!;
 
-  const r = await fetch(`${BASE}/window?${params.toString()}`);
-  if (!r.ok) throw new Error(`window fetch failed: ${r.status}`);
-  const data = await r.json();
-  return { ...data, from: data.from_ ?? data.from } as WindowResponse;
+  const p = fetch(`${BASE}/window?${key}`).then(async r => {
+    if (!r.ok) throw new Error(`window fetch failed: ${r.status}`);
+    const data = await r.json();
+    return { ...data, from: data.from_ ?? data.from } as WindowResponse;
+  }).catch(err => {
+    cache.delete(key);
+    throw err;
+  });
+
+  cache.set(key, p);
+  if (cache.size > 20) {
+    const firstKey = cache.keys().next().value;
+    if (firstKey !== undefined) cache.delete(firstKey);
+  }
+
+  return p;
 }
 
 export async function fetchStats(): Promise<{ total_posts: number; by_category: Record<string, number> }> {

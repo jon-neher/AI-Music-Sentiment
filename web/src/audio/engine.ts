@@ -119,6 +119,22 @@ export class AudioEngine {
     Tone.Transport.stop();
   }
 
+  previewPost(p: PostOut): void {
+    if (!this.started) return;
+    // Map category to instrument
+    if (p.category === "public") {
+      const degree = p.sentiment > 0 ? 7 + Math.floor(Math.random() * 5) : Math.floor(Math.random() * 5);
+      const note = noteFromScale(this.currentScale, degree);
+      this.bells.triggerAttackRelease(note, "8n");
+    } else if (p.category === "business") {
+      this.sub.triggerAttackRelease(p.sentiment > 0 ? "G2" : "C2", "8n");
+    } else if (p.category === "science") {
+      const degree = p.sentiment > 0 ? 10 + Math.floor(Math.random() * 5) : 5 + Math.floor(Math.random() * 5);
+      const freq = Tone.Frequency(noteFromScale(this.currentScale, degree)).toFrequency();
+      this.marimba.triggerAttackRelease(freq, "16n");
+    }
+  }
+
   setMix(mix: Partial<BusMix>): void {
     if (mix.public !== undefined) this.userMix.public = mix.public;
     if (mix.business !== undefined) this.userMix.business = mix.business;
