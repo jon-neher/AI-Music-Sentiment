@@ -53,3 +53,22 @@ test("constellation recovers after a viewport orientation change", async ({ page
   await page.setViewportSize({ width: 844, height: 390 });
   await expect(dots).toHaveCount(3, { timeout: 10_000 });
 });
+
+test("secondary controls are hidden behind More toggle on mobile", async ({ page }) => {
+  // Use a typical mobile viewport
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("button", { name: /enter/i }).click();
+
+  const moreBtn = page.locator("#moreBtn");
+  await expect(moreBtn).toBeVisible();
+
+  const studioBtn = page.locator("#studioBtn");
+  // Should be hidden by CSS display:none on mobile
+  await expect(studioBtn).not.toBeVisible();
+
+  await moreBtn.click();
+
+  // Should become visible when secondary-controls gets the is-open class
+  await expect(studioBtn).toBeVisible();
+});

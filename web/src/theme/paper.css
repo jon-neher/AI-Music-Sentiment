@@ -264,6 +264,14 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   align-items: center;
   z-index: 6;
 }
+.canvas .controls .secondary-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.canvas .controls .more-toggle {
+  display: none;
+}
 .canvas .controls .chip {
   font-family: var(--font-hand);
   font-size: clamp(15px, 1.6vw, 18px);
@@ -332,13 +340,39 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 .drawer .shape { flex: 0 0 14px; margin-top: 3px; }
 
 /* ------------------------------------------------------------------ */
-/* Scrubber                                                           */
+/* Bottom Bar & Scrubber                                              */
 /* ------------------------------------------------------------------ */
-.scrubber {
+.bottom-bar {
   grid-area: scrubber;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 3vw, 24px);
   height: var(--scrubber-h);
   border-top: 1px dashed rgba(0,0,0,0.2);
   padding: 8px 16px calc(8px + var(--safe-bottom));
+  position: relative;
+}
+
+.bottom-bar .play-btn {
+  font-family: var(--font-hand);
+  font-size: clamp(18px, 2.2vw, 24px);
+  padding: 4px 16px;
+  min-height: 38px;
+  background: color-mix(in srgb, var(--paper) 85%, transparent);
+  border: 1px solid rgba(26,23,19,0.55);
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--ink);
+  flex-shrink: 0;
+  transition: all 150ms ease;
+  backdrop-filter: blur(1.5px);
+}
+.bottom-bar .play-btn:hover { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+
+.scrubber {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
   position: relative;
 }
 .scrubber svg { width: 100%; height: 100%; display: block; }
@@ -455,6 +489,17 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
     visibility: visible;
   }
   .canvas .controls .sources-toggle { display: inline-flex; align-items: center; }
+  .canvas .controls .more-toggle { display: inline-flex; }
+  .canvas .controls .secondary-controls {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .canvas .controls .secondary-controls.is-open { display: flex; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -476,7 +521,15 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
     padding: 2px 8px;
     min-height: 26px;
   }
-  .legend { justify-content: flex-start; gap: 14px; }
+  .legend { 
+    justify-content: flex-start; 
+    gap: 14px; 
+    flex-wrap: nowrap; 
+    overflow-x: auto; 
+    scrollbar-width: none; 
+    -ms-overflow-style: none;
+  }
+  .legend::-webkit-scrollbar { display: none; }
   .legend-chip { font-size: 17px; }
   .legend-spark { width: 30px; }
 

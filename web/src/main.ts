@@ -31,14 +31,19 @@ function mountStage(): {
       </header>
       <section class="canvas" aria-label="Constellation">
         <div class="controls">
-          <button class="chip" id="playBtn" aria-label="Pause audio">Pause</button>
-          <button class="chip" id="studioBtn" aria-label="Toggle studio panel" title="Press S">Studio</button>
-          <button class="chip axes-toggle" id="axesBtn" aria-label="Toggle axes" title="Show axes" aria-pressed="false">?</button>
+          <button class="chip more-toggle" id="moreBtn" aria-label="More options" aria-expanded="false">More</button>
+          <div class="secondary-controls">
+            <button class="chip" id="studioBtn" aria-label="Toggle studio panel" title="Press S">Studio</button>
+            <button class="chip axes-toggle" id="axesBtn" aria-label="Toggle axes" title="Show axes" aria-pressed="false">?</button>
+          </div>
           <button class="chip sources-toggle" id="sourcesBtn" aria-label="Open sources panel" aria-expanded="false">In this window</button>
         </div>
       </section>
       <aside class="drawer" aria-label="Source drawer"></aside>
-      <footer class="scrubber" aria-label="Timeline scrubber"></footer>
+      <footer class="bottom-bar" aria-label="Playback controls">
+        <button class="chip play-btn" id="playBtn" aria-label="Pause audio">Pause</button>
+        <div class="scrubber" aria-label="Timeline scrubber"></div>
+      </footer>
     </div>
   `;
   return {
@@ -82,6 +87,16 @@ async function begin(): Promise<void> {
     playBtn.textContent = playing ? "Pause" : "Play";
     playBtn.setAttribute("aria-label", playing ? "Pause audio" : "Play audio");
   });
+  
+  const moreBtn = document.getElementById("moreBtn") as HTMLButtonElement;
+  if (moreBtn) {
+    moreBtn.addEventListener("click", () => {
+      const isExpanded = moreBtn.getAttribute("aria-expanded") === "true";
+      moreBtn.setAttribute("aria-expanded", String(!isExpanded));
+      document.querySelector(".secondary-controls")?.classList.toggle("is-open", !isExpanded);
+    });
+  }
+
   (document.getElementById("studioBtn") as HTMLButtonElement).addEventListener("click", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "s" }));
   });
