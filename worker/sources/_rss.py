@@ -10,9 +10,9 @@ import hashlib
 import html
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Iterable
 
 import feedparser
 import httpx

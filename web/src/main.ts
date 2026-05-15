@@ -204,8 +204,8 @@ async function begin(): Promise<void> {
       topbar.querySelectorAll(".modes button").forEach(b => { b.classList.remove("active"); b.setAttribute("aria-pressed", "false"); });
       btn.classList.add("active"); btn.setAttribute("aria-pressed", "true");
       const mode = btn.dataset.mode;
-      if (mode === "live") startLiveMode(scrubber, refresh);
-      else if (mode === "retro") startRetroMode(scrubber, refresh);
+      if (mode === "live") startLiveMode(refresh);
+      else if (mode === "retro") startRetroMode(refresh);
     });
   });
 
@@ -240,13 +240,13 @@ async function begin(): Promise<void> {
   }
 }
 
-function startLiveMode(scrubber: Scrubber, refresh: (f: Date, t: Date) => Promise<void>) {
+function startLiveMode(refresh: (f: Date, t: Date) => Promise<void>) {
   const to = new Date();
   const from = new Date(to.getTime() - 86400_000);
   refresh(from, to);
 }
 
-function startRetroMode(scrubber: Scrubber, refresh: (f: Date, t: Date) => Promise<void>) {
+function startRetroMode(refresh: (f: Date, t: Date) => Promise<void>) {
   const startMs = TIMELINE_START.getTime();
   const endMs = Date.now();
   const durationMs = 8 * 60 * 1000; // 8 minutes

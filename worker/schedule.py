@@ -17,11 +17,11 @@ from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sqlalchemy import func, select
 
-from .ingest import run_recent
 from .aggregate import rollup_recent
 from .backfill import run_backfill
 from .config import get_settings
 from .db import Post, SessionLocal, init_db
+from .ingest import run_recent
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("worker.schedule")

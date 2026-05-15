@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Iterable, List
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -13,24 +13,24 @@ from .config import get_settings
 from .db import Post, SessionLocal, init_db
 from .score import score_batch
 from .sources import RawPost
-from .sources import hn as hn_source
-from .sources import arxiv as arxiv_source
-from .sources import gdelt as gdelt_source
-from .sources import reddit as reddit_source
-from .sources import newsapi as newsapi_source
-from .sources import semanticscholar as ss_source
-from .sources import bluesky as bluesky_source
-from .sources import theverge as theverge_source
 from .sources import arstechnica as arstechnica_source
-from .sources import techcrunch as techcrunch_source
-from .sources import mittr as mittr_source
-from .sources import wired as wired_source
-from .sources import media404 as media404_source
+from .sources import arxiv as arxiv_source
 from .sources import bloomberg as bloomberg_source
-from .sources import wsj as wsj_source
+from .sources import bluesky as bluesky_source
 from .sources import cnbc as cnbc_source
 from .sources import economist as economist_source
 from .sources import fastcompany as fastcompany_source
+from .sources import gdelt as gdelt_source
+from .sources import hn as hn_source
+from .sources import media404 as media404_source
+from .sources import mittr as mittr_source
+from .sources import newsapi as newsapi_source
+from .sources import reddit as reddit_source
+from .sources import semanticscholar as ss_source
+from .sources import techcrunch as techcrunch_source
+from .sources import theverge as theverge_source
+from .sources import wired as wired_source
+from .sources import wsj as wsj_source
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ def _row(r: RawPost, sent: float, emo: dict) -> dict:
     }
 
 
-def _upsert_posts(raws: List[RawPost]) -> int:
+def _upsert_posts(raws: list[RawPost]) -> int:
     """Upsert posts, only scoring ones that don't yet exist.
 
     Sentiment/emotion scoring is the hot path (torch inference); a full
@@ -78,7 +78,7 @@ def _upsert_posts(raws: List[RawPost]) -> int:
     if new_raws:
         texts = [f"{r.title}. {r.snippet}" for r in new_raws]
         scores = score_batch(texts, settings.sentiment_model, settings.emotion_model)
-        for r, (sent, emo) in zip(new_raws, scores):
+        for r, (sent, emo) in zip(new_raws, scores, strict=False):
             rows.append(_row(r, sent, emo))
     # Known posts: dummy sentiment/emotions; the ON CONFLICT clause below only
     # refreshes ``reach``, so the original scores are preserved.
@@ -106,7 +106,7 @@ def run_window(from_dt: datetime, to_dt: datetime) -> dict:
     from_ts = int(from_dt.timestamp())
     to_ts = int(to_dt.timestamp())
 
-    sources: List[tuple[str, Callable[[], Iterable[RawPost]]]] = [
+    sources: list[tuple[str, Callable[[], Iterable[RawPost]]]] = [
         ("hn",              lambda: hn_source.fetch(from_ts, to_ts)),
         ("arxiv",           lambda: arxiv_source.fetch(from_dt, to_dt)),
         ("gdelt",           lambda: gdelt_source.fetch(from_dt, to_dt)),

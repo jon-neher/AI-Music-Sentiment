@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
-
-from app.models import Post, DailyAggregate
+from app.models import DailyAggregate, Post
 from app.schemas import PostOut
 
 

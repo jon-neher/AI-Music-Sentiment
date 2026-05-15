@@ -1,12 +1,12 @@
 """arXiv ingest via the public export API. Category = science."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timezone
-from typing import Iterable
 from urllib.parse import urlencode
 
-import httpx
 import feedparser
+import httpx
 
 from . import RawPost
 

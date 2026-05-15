@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+
 from pydantic import BaseModel
 
 
@@ -13,8 +13,8 @@ class PostOut(BaseModel):
     author: str = ""
     published_at: datetime
     sentiment: float
-    emotions: Dict[str, float] = {}
-    topics: List[str] = []
+    emotions: dict[str, float] = {}
+    topics: list[str] = []
     reach: int = 0
 
     class Config:
@@ -28,8 +28,8 @@ class AggregateOut(BaseModel):
     mean_sentiment: float
     variance: float
     volume: int
-    emotions: Dict[str, float] = {}
-    exemplar_ids: List[str] = []
+    emotions: dict[str, float] = {}
+    exemplar_ids: list[str] = []
 
     class Config:
         from_attributes = True
@@ -38,8 +38,8 @@ class AggregateOut(BaseModel):
 class WindowResponse(BaseModel):
     from_: datetime
     to: datetime
-    aggregates: List[AggregateOut]
-    exemplars: List[PostOut]
+    aggregates: list[AggregateOut]
+    exemplars: list[PostOut]
 
     class Config:
         populate_by_name = True
@@ -47,6 +47,6 @@ class WindowResponse(BaseModel):
 
 class StatsResponse(BaseModel):
     total_posts: int
-    first_post_at: Optional[datetime]
-    last_post_at: Optional[datetime]
-    by_category: Dict[str, int]
+    first_post_at: datetime | None
+    last_post_at: datetime | None
+    by_category: dict[str, int]

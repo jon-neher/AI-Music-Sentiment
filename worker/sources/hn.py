@@ -1,8 +1,8 @@
 """Hacker News ingest via Algolia public API. Covers 2007->present."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timezone
-from typing import Iterable, List
 
 import httpx
 
@@ -12,7 +12,7 @@ from . import RawPost
 ALGOLIA_URL = "https://hn.algolia.com/api/v1/search_by_date"
 
 
-def _matches(text: str, keywords: List[str]) -> bool:
+def _matches(text: str, keywords: list[str]) -> bool:
     t = (text or "").lower()
     return any(k in t for k in keywords)
 

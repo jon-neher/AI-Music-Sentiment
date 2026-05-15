@@ -4,8 +4,8 @@ from fastapi.responses import ORJSONResponse
 
 from .config import get_settings
 from .db import Base, engine
-from .routes import window as window_routes
 from .routes import live as live_routes
+from .routes import window as window_routes
 
 settings = get_settings()
 

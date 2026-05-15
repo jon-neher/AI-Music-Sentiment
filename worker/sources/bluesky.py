@@ -10,8 +10,8 @@ Reach = likeCount + repostCount + replyCount.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from datetime import datetime, timezone
-from typing import Iterable, Optional
 
 import httpx
 
@@ -32,7 +32,7 @@ _MAX_PAGES = 10
 _PER_QUERY_CAP = 500
 
 
-def _parse_created(value: str) -> Optional[datetime]:
+def _parse_created(value: str) -> datetime | None:
     if not value:
         return None
     try:
@@ -44,7 +44,7 @@ def _parse_created(value: str) -> Optional[datetime]:
     return dt
 
 
-def _create_session(identifier: str, app_password: str, user_agent: str) -> Optional[str]:
+def _create_session(identifier: str, app_password: str, user_agent: str) -> str | None:
     try:
         r = httpx.post(
             _SESSION_URL,
@@ -79,7 +79,7 @@ def fetch(from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
 
     with httpx.Client(timeout=30.0, follow_redirects=True, headers=headers) as client:
         for q in _QUERIES:
-            cursor: Optional[str] = None
+            cursor: str | None = None
             count = 0
             for _ in range(_MAX_PAGES):
                 if count >= _PER_QUERY_CAP:

@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 
 from dateutil.relativedelta import relativedelta
 
+from .aggregate import rollup_range
 from .config import get_settings
 from .ingest import run_window
-from .aggregate import rollup_range
 
 log = logging.getLogger(__name__)
 

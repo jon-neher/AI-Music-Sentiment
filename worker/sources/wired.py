@@ -1,11 +1,12 @@
 """Wired -- AI tag RSS."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable
 
 from . import RawPost
-from ._rss import FeedConfig, fetch as _rss_fetch
+from ._rss import FeedConfig
+from ._rss import fetch as _rss_fetch
 
 _FEED = FeedConfig(
     source="wired",

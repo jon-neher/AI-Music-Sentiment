@@ -1,12 +1,12 @@
 from datetime import datetime
-from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import DailyAggregate, Post
-from ..schemas import WindowResponse, AggregateOut, PostOut, StatsResponse
+from ..schemas import AggregateOut, PostOut, StatsResponse, WindowResponse
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ router = APIRouter()
 def window(
     from_: datetime = Query(..., alias="from"),
     to: datetime = Query(...),
-    sources: Optional[str] = Query(None, description="comma-separated category filter"),
+    sources: str | None = Query(None, description="comma-separated category filter"),
     limit_exemplars: int = Query(200, le=2000),
     db: Session = Depends(get_db),
 ):
