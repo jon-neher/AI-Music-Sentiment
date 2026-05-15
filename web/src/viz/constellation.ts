@@ -38,6 +38,7 @@ export class Constellation {
   private dotsLayer!: d3.Selection<SVGGElement, unknown, null, undefined>;
   private marginsLayer!: d3.Selection<SVGGElement, unknown, null, undefined>;
   private axesLayer!: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private liveRegion!: HTMLDivElement;
   private lastPosts: PostOut[] = [];
   private axesOn = false;
   private ro?: ResizeObserver;
@@ -53,6 +54,25 @@ export class Constellation {
       .attr("aria-label", "Constellation of AI-sentiment posts")
       .node()!;
     this.svg = d3.select(node);
+
+    let existingLive = container.querySelector<HTMLDivElement>(":scope > .aria-live-region");
+    if (!existingLive) {
+      existingLive = document.createElement("div");
+      existingLive.className = "aria-live-region";
+      existingLive.setAttribute("aria-live", "polite");
+      existingLive.setAttribute("aria-atomic", "true");
+      existingLive.style.position = "absolute";
+      existingLive.style.width = "1px";
+      existingLive.style.height = "1px";
+      existingLive.style.padding = "0";
+      existingLive.style.margin = "-1px";
+      existingLive.style.overflow = "hidden";
+      existingLive.style.clip = "rect(0, 0, 0, 0)";
+      existingLive.style.whiteSpace = "nowrap";
+      existingLive.style.border = "0";
+      container.appendChild(existingLive);
+    }
+    this.liveRegion = existingLive;
 
     // Persistent layer structure: margins under dots, ghost-axes above dots.
     // Re-using existing groups if we were re-constructed keeps things idempotent
@@ -163,8 +183,28 @@ export class Constellation {
       .attr("fill-opacity", 0.0)
       .attr("stroke", "var(--ink)")
       .attr("stroke-width", 0.6)
+      .attr("tabindex", "0")
+      .attr("role", "link")
+      .attr("aria-label", d => `${d.title}, source: ${d.source}, sentiment: ${formatSent(d.sentiment)}, reach: ${formatReach(d.reach)}`)
       .style("cursor", "pointer")
-      .on("click", (_, d) => window.open(d.url, "_blank", "noopener"));
+      .style("outline", "none")
+      .on("click", (_, d) => window.open(d.url, "_blank", "noopener"))
+      .on("keydown", (e, d) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          window.open(d.url, "_blank", "noopener");
+        }
+      })
+      .on("focus", (e, d) => {
+        d3.select(e.currentTarget).attr("stroke-width", 2.5);
+        if (this.liveRegion) {
+          this.liveRegion.textContent = `${d.title}. Sentiment: ${formatSent(d.sentiment)}, reach: ${formatReach(d.reach)}.`;
+        }
+        window.dispatchEvent(new CustomEvent("dot-focus", { detail: d }));
+      })
+      .on("blur", (e) => {
+        d3.select(e.currentTarget).attr("stroke-width", 0.6);
+      });
 
     enter.append("title").text(d =>
       `${d.title}  [${d.source}]  ·  sent ${formatSent(d.sentiment)}  ·  reach ${formatReach(d.reach)}`

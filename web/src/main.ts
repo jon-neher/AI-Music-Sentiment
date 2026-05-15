@@ -116,23 +116,87 @@ async function begin(): Promise<void> {
   // Sources drawer toggle (tablet / mobile). On desktop the drawer is a
   // permanent side column and the button itself is hidden via CSS.
   const sourcesBtn = document.getElementById("sourcesBtn") as HTMLButtonElement;
+  drawerEl.setAttribute("tabindex", "-1");
+  
   sourcesBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     const open = document.body.classList.toggle("drawer-open");
     sourcesBtn.setAttribute("aria-expanded", String(open));
+    if (open) {
+      document.body.style.overflow = "hidden";
+      drawerEl.focus();
+    } else {
+      document.body.style.overflow = "";
+    }
   });
+
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && document.body.classList.contains("drawer-open")) {
       document.body.classList.remove("drawer-open");
       sourcesBtn.setAttribute("aria-expanded", "false");
+      document.body.style.overflow = "";
+      sourcesBtn.focus();
     }
   });
+
   document.addEventListener("click", (e) => {
     if (!document.body.classList.contains("drawer-open")) return;
     const target = e.target as HTMLElement;
     if (target.closest(".drawer") || target.closest(".sources-toggle")) return;
     document.body.classList.remove("drawer-open");
     sourcesBtn.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+  });
+
+  // Touch gesture support (swipe down to dismiss)
+  let touchStartY = 0;
+  let touchCurrentY = 0;
+  drawerEl.addEventListener("touchstart", (e) => {
+    if (!document.body.classList.contains("drawer-open")) return;
+    if (drawerEl.scrollTop > 0) return; // Only allow swipe down from top
+    touchStartY = e.touches[0].clientY;
+    touchCurrentY = touchStartY;
+  }, { passive: true });
+  
+  drawerEl.addEventListener("touchmove", (e) => {
+    if (!document.body.classList.contains("drawer-open") || drawerEl.scrollTop > 0) return;
+    touchCurrentY = e.touches[0].clientY;
+    const deltaY = Math.max(0, touchCurrentY - touchStartY);
+    drawerEl.style.transform = `translateY(${deltaY}px)`;
+    if (deltaY > 0 && e.cancelable) e.preventDefault();
+  });
+  
+  drawerEl.addEventListener("touchend", () => {
+    if (!document.body.classList.contains("drawer-open")) return;
+    drawerEl.style.transform = ""; // Reset inline transform for CSS transition
+    const deltaY = touchCurrentY - touchStartY;
+    if (deltaY > 100) {
+      document.body.classList.remove("drawer-open");
+      sourcesBtn.setAttribute("aria-expanded", "false");
+      document.body.style.overflow = "";
+    }
+  });
+
+  // Focus trapping
+  drawerEl.addEventListener("keydown", (e) => {
+    if (e.key === "Tab" && document.body.classList.contains("drawer-open")) {
+      const focusable = drawerEl.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          last.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === last) {
+          first.focus();
+          e.preventDefault();
+        }
+      }
+    }
   });
 
   topbar.querySelectorAll<HTMLButtonElement>(".modes button").forEach(btn => {
@@ -156,6 +220,10 @@ async function begin(): Promise<void> {
       const nt = new Date(t.getTime() + days * 86400_000);
       refresh(nf, nt);
     }
+  });
+
+  window.addEventListener("dot-focus", (e: any) => {
+    engine.previewPost(e.detail);
   });
 
   async function refresh(from: Date, to: Date) {
@@ -191,9 +259,18 @@ function startRetroMode(scrubber: Scrubber, refresh: (f: Date, t: Date) => Promi
     const center = startMs + (endMs - startMs) * p;
     const windowW = (endMs - startMs) * 0.03;
     refresh(new Date(center - windowW / 2), new Date(center + windowW / 2));
+    
+    // Prefetch next window
+    const nextElapsed = elapsed + stepMs;
+    if (nextElapsed <= durationMs) {
+      const nextP = nextElapsed / durationMs;
+      const nextCenter = startMs + (endMs - startMs) * nextP;
+      fetchWindow(new Date(nextCenter - windowW / 2), new Date(nextCenter + windowW / 2)).catch(() => {});
+    }
+
     setTimeout(tick, stepMs);
   };
   tick();
 }
 
-mountLanding(() => { begin(); });
+mountLanding(() => begin());

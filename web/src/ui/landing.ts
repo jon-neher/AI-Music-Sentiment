@@ -1,4 +1,4 @@
-export function mountLanding(onEnter: () => void): void {
+export function mountLanding(onEnter: () => Promise<void>): void {
   const el = document.createElement("div");
   el.className = "landing";
   el.innerHTML = `
@@ -8,10 +8,22 @@ export function mountLanding(onEnter: () => void): void {
       <button type="button" aria-label="Enter the piece">Enter</button>
     </div>
   `;
-  el.querySelector("button")!.addEventListener("click", () => {
-    el.style.transition = "opacity 800ms ease";
-    el.style.opacity = "0";
-    setTimeout(() => { el.remove(); onEnter(); }, 800);
+  const btn = el.querySelector("button")!;
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = "Loading...";
+    
+    try {
+      await onEnter();
+      el.style.transition = "opacity 800ms ease";
+      el.style.opacity = "0";
+      setTimeout(() => { el.remove(); }, 800);
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   });
   document.body.appendChild(el);
 }
