@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -161,5 +161,5 @@ def run_window(from_dt: datetime, to_dt: datetime) -> dict:
 
 
 def run_recent(hours: int = 2) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return run_window(now - timedelta(hours=hours), now)

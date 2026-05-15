@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections.abc import Iterable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
@@ -49,7 +49,7 @@ def fetch(from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
         log.info("NEWSAPI_KEY unset; skipping newsapi.")
         return
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now - timedelta(days=_MAX_DAYS - 1)
     effective_from = max(from_dt, cutoff)
     if effective_from >= to_dt:
@@ -83,7 +83,7 @@ def fetch(from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
             if not url:
                 continue
             try:
-                published = datetime.strptime(a.get("publishedAt") or "", "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                published = datetime.strptime(a.get("publishedAt") or "", "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
             except ValueError:
                 continue
             yield RawPost(

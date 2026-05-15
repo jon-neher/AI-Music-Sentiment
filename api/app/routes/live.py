@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.websocket("/ws/live")
 async def live(ws: WebSocket):
     await ws.accept()
-    last_ts = datetime.now(timezone.utc) - timedelta(minutes=5)
+    last_ts = datetime.now(UTC) - timedelta(minutes=5)
     try:
         while True:
             with SessionLocal() as s:

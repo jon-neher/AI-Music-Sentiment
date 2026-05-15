@@ -12,7 +12,7 @@ from breaking news to constellation while cutting worker load ~75%%.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from sqlalchemy import func, select
@@ -35,7 +35,7 @@ _HEAD_TOLERANCE = timedelta(days=1)
 
 
 def _ensure_utc(dt: datetime) -> datetime:
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _plan_backfill_windows() -> list[tuple[datetime, datetime]]:
@@ -46,8 +46,8 @@ def _plan_backfill_windows() -> list[tuple[datetime, datetime]]:
       and/or a tail gap (max .. now). Returns [] when fully covered.
     """
     settings = get_settings()
-    configured_start = datetime.fromisoformat(settings.backfill_start).replace(tzinfo=timezone.utc)
-    now = datetime.now(timezone.utc)
+    configured_start = datetime.fromisoformat(settings.backfill_start).replace(tzinfo=UTC)
+    now = datetime.now(UTC)
 
     with SessionLocal() as s:
         row = s.execute(

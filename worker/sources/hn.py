@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -55,7 +55,7 @@ def fetch(from_ts: int, to_ts: int, max_pages: int = 50) -> Iterable[RawPost]:
                     snippet=(h.get("story_text") or "")[:500],
                     url=url,
                     author=h.get("author") or "",
-                    published_at=datetime.fromtimestamp(ts, tz=timezone.utc),
+                    published_at=datetime.fromtimestamp(ts, tz=UTC),
                     reach=int(h.get("points") or 0),
                     topics=[],
                 )

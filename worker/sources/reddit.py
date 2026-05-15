@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -78,7 +78,7 @@ def _emit_submission(d: dict, sub: str) -> RawPost | None:
         snippet=body[:500],
         url="https://reddit.com" + (d.get("permalink") or ""),
         author=d.get("author") or "",
-        published_at=datetime.fromtimestamp(created, tz=timezone.utc),
+        published_at=datetime.fromtimestamp(created, tz=UTC),
         reach=int(d.get("ups") or 0) + int(d.get("num_comments") or 0),
         topics=[sub],
     )
@@ -120,7 +120,7 @@ def _iter_comments(
             snippet=body[:500],
             url="https://reddit.com" + (cd.get("permalink") or ""),
             author=author,
-            published_at=datetime.fromtimestamp(created, tz=timezone.utc),
+            published_at=datetime.fromtimestamp(created, tz=UTC),
             reach=int(cd.get("score") or 0),
             topics=[sub],
         )

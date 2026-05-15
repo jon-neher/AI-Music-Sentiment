@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import statistics
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, delete, select
 
@@ -58,5 +58,5 @@ def rollup_range(from_day: datetime, to_day: datetime) -> int:
 
 
 def rollup_recent(days: int = 3) -> int:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return rollup_range(now - timedelta(days=days), now)
