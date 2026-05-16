@@ -9,6 +9,11 @@ import { mountLanding } from "./ui/landing";
 import { Legend } from "./ui/legend";
 
 const TIMELINE_START = new Date("2015-01-01T00:00:00Z");
+const DAY_MS = 86400_000;
+const DATE_SHORT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const DATE_FULL = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+type Mode = "live" | "retro" | "explore";
 
 function mountStage(): {
   canvasEl: HTMLElement;
@@ -43,6 +48,12 @@ function mountStage(): {
       <footer class="bottom-bar" aria-label="Playback controls">
         <button class="chip play-btn" id="playBtn" aria-label="Pause audio">Pause</button>
         <div class="scrubber" aria-label="Timeline scrubber"></div>
+        <div class="window-controls" aria-label="Timeline navigation">
+          <button class="chip step-btn" id="windowPrevBtn" aria-label="Move to earlier time window">←</button>
+          <span class="window-label" id="windowLabel" aria-live="polite"></span>
+          <button class="chip step-btn" id="windowNextBtn" aria-label="Move to later time window">→</button>
+          <button class="chip step-btn now-btn" id="windowNowBtn" aria-label="Jump to most recent time window">Now</button>
+        </div>
       </footer>
     </div>
   `;
@@ -57,17 +68,51 @@ function mountStage(): {
 
 async function begin(): Promise<void> {
   const { canvasEl, drawerEl, scrubberEl, topbar, legendSlot } = mountStage();
+  let refreshVersion = 0;
   const engine = new AudioEngine();
   await engine.start();
   mountStudio(engine);
   attachQuoteCards(canvasEl);
 
+  const windowLabel = document.getElementById("windowLabel") as HTMLSpanElement;
+  const modeButtons = Array.from(topbar.querySelectorAll<HTMLButtonElement>(".modes button"));
+  const moreBtn = document.getElementById("moreBtn") as HTMLButtonElement;
+  const secondaryControls = document.querySelector(".secondary-controls") as HTMLElement | null;
+  const sourcesBtn = document.getElementById("sourcesBtn") as HTMLButtonElement;
+  const prevWindowBtn = document.getElementById("windowPrevBtn") as HTMLButtonElement;
+  const nextWindowBtn = document.getElementById("windowNextBtn") as HTMLButtonElement;
+  const nowWindowBtn = document.getElementById("windowNowBtn") as HTMLButtonElement;
+
+  const closeSecondaryControls = () => {
+    moreBtn.setAttribute("aria-expanded", "false");
+    secondaryControls?.classList.remove("is-open");
+  };
+
+  const closeDrawer = (restoreFocus = false) => {
+    document.body.classList.remove("drawer-open");
+    sourcesBtn.setAttribute("aria-expanded", "false");
+    document.body.style.overflow = "";
+    if (restoreFocus) sourcesBtn.focus();
+  };
+
+  const openDrawer = () => {
+    document.body.classList.add("drawer-open");
+    sourcesBtn.setAttribute("aria-expanded", "true");
+    document.body.style.overflow = "hidden";
+    drawerEl.focus();
+  };
+
   const constellation = new Constellation(canvasEl);
+  let stopModePlayback: (() => void) | null = null;
   const now = new Date();
   const scrubber = new Scrubber(scrubberEl, {
     start: TIMELINE_START,
     end: now,
-    onWindow: (from, to) => refresh(from, to),
+    onWindow: (from, to) => {
+      windowLabel.textContent = formatWindowRange(from, to);
+      refresh(from, to);
+    },
+    onInteract: () => setMode("explore"),
   });
 
   // Category legend (marginalia): solos / mutes the three voices visually & audibly.
@@ -76,6 +121,7 @@ async function begin(): Promise<void> {
   });
 
   const [from0, to0] = scrubber.getWindow();
+  windowLabel.textContent = formatWindowRange(from0, to0);
   await refresh(from0, to0);
 
   // Play/pause + mode buttons
@@ -87,17 +133,16 @@ async function begin(): Promise<void> {
     playBtn.textContent = playing ? "Pause" : "Play";
     playBtn.setAttribute("aria-label", playing ? "Pause audio" : "Play audio");
   });
-  
-  const moreBtn = document.getElementById("moreBtn") as HTMLButtonElement;
-  if (moreBtn) {
-    moreBtn.addEventListener("click", () => {
-      const isExpanded = moreBtn.getAttribute("aria-expanded") === "true";
-      moreBtn.setAttribute("aria-expanded", String(!isExpanded));
-      document.querySelector(".secondary-controls")?.classList.toggle("is-open", !isExpanded);
-    });
-  }
+
+  moreBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isExpanded = moreBtn.getAttribute("aria-expanded") === "true";
+    moreBtn.setAttribute("aria-expanded", String(!isExpanded));
+    secondaryControls?.classList.toggle("is-open", !isExpanded);
+  });
 
   (document.getElementById("studioBtn") as HTMLButtonElement).addEventListener("click", () => {
+    closeSecondaryControls();
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "s" }));
   });
 
@@ -111,41 +156,43 @@ async function begin(): Promise<void> {
     axesBtn.setAttribute("aria-pressed", String(on));
     axesBtn.classList.toggle("is-on", on);
     axesBtn.setAttribute("title", on ? "Hide axes" : "Show axes");
+    closeSecondaryControls();
   });
 
   // Sources drawer toggle (tablet / mobile). On desktop the drawer is a
   // permanent side column and the button itself is hidden via CSS.
-  const sourcesBtn = document.getElementById("sourcesBtn") as HTMLButtonElement;
   drawerEl.setAttribute("tabindex", "-1");
-  
+
   sourcesBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    const open = document.body.classList.toggle("drawer-open");
-    sourcesBtn.setAttribute("aria-expanded", String(open));
-    if (open) {
-      document.body.style.overflow = "hidden";
-      drawerEl.focus();
-    } else {
-      document.body.style.overflow = "";
-    }
+    closeSecondaryControls();
+    if (document.body.classList.contains("drawer-open")) closeDrawer();
+    else openDrawer();
   });
 
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && document.body.classList.contains("drawer-open")) {
-      document.body.classList.remove("drawer-open");
-      sourcesBtn.setAttribute("aria-expanded", "false");
-      document.body.style.overflow = "";
-      sourcesBtn.focus();
+    if (e.key !== "Escape") return;
+    let handled = false;
+    if (document.body.classList.contains("drawer-open")) {
+      closeDrawer(true);
+      handled = true;
+    }
+    if (moreBtn.getAttribute("aria-expanded") === "true") {
+      closeSecondaryControls();
+      handled = true;
+    }
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
     }
   });
 
   document.addEventListener("click", (e) => {
-    if (!document.body.classList.contains("drawer-open")) return;
     const target = e.target as HTMLElement;
+    if (!target.closest(".controls")) closeSecondaryControls();
+    if (!document.body.classList.contains("drawer-open")) return;
     if (target.closest(".drawer") || target.closest(".sources-toggle")) return;
-    document.body.classList.remove("drawer-open");
-    sourcesBtn.setAttribute("aria-expanded", "false");
-    document.body.style.overflow = "";
+    closeDrawer();
   });
 
   // Touch gesture support (swipe down to dismiss)
@@ -171,9 +218,7 @@ async function begin(): Promise<void> {
     drawerEl.style.transform = ""; // Reset inline transform for CSS transition
     const deltaY = touchCurrentY - touchStartY;
     if (deltaY > 100) {
-      document.body.classList.remove("drawer-open");
-      sourcesBtn.setAttribute("aria-expanded", "false");
-      document.body.style.overflow = "";
+      closeDrawer();
     }
   });
 
@@ -199,26 +244,34 @@ async function begin(): Promise<void> {
     }
   });
 
-  topbar.querySelectorAll<HTMLButtonElement>(".modes button").forEach(btn => {
+  modeButtons.forEach(btn => {
     btn.addEventListener("click", () => {
-      topbar.querySelectorAll(".modes button").forEach(b => { b.classList.remove("active"); b.setAttribute("aria-pressed", "false"); });
-      btn.classList.add("active"); btn.setAttribute("aria-pressed", "true");
-      const mode = btn.dataset.mode;
-      if (mode === "live") startLiveMode(refresh);
-      else if (mode === "retro") startRetroMode(refresh);
+      const mode = (btn.dataset.mode ?? "explore") as Mode;
+      setMode(mode);
     });
+  });
+
+  prevWindowBtn.addEventListener("click", () => {
+    setMode("explore");
+    scrubber.shiftByFraction(-0.5);
+  });
+  nextWindowBtn.addEventListener("click", () => {
+    setMode("explore");
+    scrubber.shiftByFraction(0.5);
+  });
+  nowWindowBtn.addEventListener("click", () => {
+    setMode("explore");
+    scrubber.jumpToLatest();
   });
 
   // Keyboard nav: arrow keys step window
   window.addEventListener("keydown", (e) => {
-    const [f, t] = scrubber.getWindow();
     let days = 0;
     if (e.key === "ArrowRight") days = e.shiftKey ? 7 : e.altKey ? 30 : 1;
     if (e.key === "ArrowLeft")  days = -(e.shiftKey ? 7 : e.altKey ? 30 : 1);
     if (days !== 0) {
-      const nf = new Date(f.getTime() + days * 86400_000);
-      const nt = new Date(t.getTime() + days * 86400_000);
-      refresh(nf, nt);
+      setMode("explore");
+      scrubber.shiftByDays(days);
     }
   });
 
@@ -226,40 +279,60 @@ async function begin(): Promise<void> {
     engine.previewPost(e.detail);
   });
 
+  function setMode(mode: Mode): void {
+    modeButtons.forEach(b => {
+      const selected = b.dataset.mode === mode;
+      b.classList.toggle("active", selected);
+      b.setAttribute("aria-pressed", String(selected));
+    });
+    stopModePlayback?.();
+    stopModePlayback = null;
+    if (mode === "live") stopModePlayback = startLiveMode(scrubber);
+    if (mode === "retro") stopModePlayback = startRetroMode(scrubber);
+  }
+
   async function refresh(from: Date, to: Date) {
+    const version = ++refreshVersion;
     try {
       const win = await fetchWindow(from, to);
+      if (version !== refreshVersion) return;
       constellation.render(win.exemplars);
       renderDrawer(drawerEl, win.exemplars);
       scrubber.draw(win.aggregates);
       legend.setWindow(win.aggregates);
       engine.updateFromWindow(win.aggregates, win.exemplars);
     } catch (err) {
+      if (version !== refreshVersion) return;
       console.warn("refresh failed", err);
     }
   }
 }
 
-function startLiveMode(refresh: (f: Date, t: Date) => Promise<void>) {
+function startLiveMode(scrubber: Scrubber): () => void {
   const to = new Date();
-  const from = new Date(to.getTime() - 86400_000);
-  refresh(from, to);
+  const from = new Date(to.getTime() - DAY_MS);
+  scrubber.setWindow(from, to);
+  return () => {};
 }
 
-function startRetroMode(refresh: (f: Date, t: Date) => Promise<void>) {
+function startRetroMode(scrubber: Scrubber): () => void {
   const startMs = TIMELINE_START.getTime();
   const endMs = Date.now();
   const durationMs = 8 * 60 * 1000; // 8 minutes
   const stepMs = 2500;
   const t0 = performance.now();
+  let timeoutId: number | null = null;
+  let cancelled = false;
+
   const tick = () => {
+    if (cancelled) return;
     const elapsed = performance.now() - t0;
     if (elapsed > durationMs) return;
     const p = elapsed / durationMs;
     const center = startMs + (endMs - startMs) * p;
     const windowW = (endMs - startMs) * 0.03;
-    refresh(new Date(center - windowW / 2), new Date(center + windowW / 2));
-    
+    scrubber.setWindow(new Date(center - windowW / 2), new Date(center + windowW / 2));
+
     // Prefetch next window
     const nextElapsed = elapsed + stepMs;
     if (nextElapsed <= durationMs) {
@@ -268,9 +341,22 @@ function startRetroMode(refresh: (f: Date, t: Date) => Promise<void>) {
       fetchWindow(new Date(nextCenter - windowW / 2), new Date(nextCenter + windowW / 2)).catch(() => {});
     }
 
-    setTimeout(tick, stepMs);
+    timeoutId = window.setTimeout(tick, stepMs);
   };
   tick();
+  return () => {
+    cancelled = true;
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+  };
+}
+
+function formatWindowRange(from: Date, to: Date): string {
+  const start = from.getTime() <= to.getTime() ? from : to;
+  const end = from.getTime() <= to.getTime() ? to : from;
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${DATE_SHORT.format(start)} – ${DATE_FULL.format(end)}`;
+  }
+  return `${DATE_FULL.format(start)} – ${DATE_FULL.format(end)}`;
 }
 
 mountLanding(() => begin());

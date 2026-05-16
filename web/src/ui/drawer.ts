@@ -1,6 +1,14 @@
 import type { PostOut } from "../data/api";
 
 export function renderDrawer(container: HTMLElement, posts: PostOut[]): void {
+  if (posts.length === 0) {
+    container.innerHTML = `
+      <h2>In this window</h2>
+      <p class="empty-state">No sources in this time window yet. Drag the timeline or use the arrow controls to browse nearby periods.</p>
+    `;
+    return;
+  }
+
   container.innerHTML = `<h2>In this window</h2>` + posts.slice(0, 60).map(p => `
     <div class="row">
       <span class="shape" aria-hidden="true">${shape(p.category)}</span>

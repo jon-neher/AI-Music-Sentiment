@@ -165,8 +165,8 @@ describe("Constellation", () => {
 
     expect(() => c.render([])).not.toThrow();
     expect(canvas.querySelectorAll("path.dot").length).toBe(0);
-    // Margins cleared when there's nothing to orient.
-    expect(canvas.querySelector("g.margins")?.children.length ?? 0).toBe(0);
+    const emptyCopy = Array.from(canvas.querySelectorAll("g.margins text")).map(t => t.textContent ?? "");
+    expect(emptyCopy).toContain("No posts in this window");
   });
 
   it("renders hopeful/fearful margin labels, a neutral line, and date anchors", () => {

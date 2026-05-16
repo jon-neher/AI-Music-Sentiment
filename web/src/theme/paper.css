@@ -105,6 +105,7 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   .legend-chip,
   .canvas .controls .chip,
   .canvas .controls .sources-toggle,
+  .window-controls .step-btn,
   .studio .presets button {
     min-height: 44px;
     min-width: 44px;
@@ -256,12 +257,14 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 .canvas .controls {
   position: absolute;
   top: 12px;
+  left: auto;
   right: calc(12px + var(--safe-right));
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   align-items: center;
+  max-width: calc(100% - 24px - var(--safe-left) - var(--safe-right));
   z-index: 6;
 }
 .canvas .controls .secondary-controls {
@@ -269,6 +272,7 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   gap: 8px;
   align-items: center;
 }
+.canvas .controls .secondary-controls .chip { white-space: nowrap; }
 .canvas .controls .more-toggle {
   display: none;
 }
@@ -335,6 +339,13 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   border-bottom: 1px dotted rgba(0,0,0,0.15);
   font-size: 14px;
 }
+.drawer .empty-state {
+  margin: 12px 2px 0;
+  color: var(--ink-soft);
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.4;
+}
 .drawer .row a { color: var(--ink); text-decoration: none; }
 .drawer .row a:hover { text-decoration: underline; }
 .drawer .shape { flex: 0 0 14px; margin-top: 3px; }
@@ -346,8 +357,10 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   grid-area: scrubber;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  align-content: center;
   gap: clamp(12px, 3vw, 24px);
-  height: var(--scrubber-h);
+  min-height: var(--scrubber-h);
   border-top: 1px dashed rgba(0,0,0,0.2);
   padding: 8px 16px calc(8px + var(--safe-bottom));
   position: relative;
@@ -370,12 +383,51 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
 .bottom-bar .play-btn:hover { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 
 .scrubber {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 280px;
+  min-width: 180px;
   height: 100%;
   position: relative;
 }
-.scrubber svg { width: 100%; height: 100%; display: block; }
+.scrubber svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.window-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
+}
+.window-controls .step-btn {
+  min-height: 30px;
+  min-width: 32px;
+  padding: 2px 8px;
+  font-family: var(--font-hand);
+  font-size: 17px;
+  line-height: 1;
+  border: 1px solid rgba(26,23,19,0.55);
+  background: color-mix(in srgb, var(--paper) 85%, transparent);
+  color: var(--ink);
+}
+.window-controls .now-btn {
+  min-width: 46px;
+  font-size: 14px;
+}
+.window-controls .window-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  max-width: clamp(140px, 28vw, 240px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
 
 /* Per-category line opacity — same vars as constellation. */
 .scrubber svg path.cat-line[data-cat="public"]   { opacity: var(--opacity-public, 1); transition: opacity 260ms ease; }
@@ -490,6 +542,12 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   }
   .canvas .controls .sources-toggle { display: inline-flex; align-items: center; }
   .canvas .controls .more-toggle { display: inline-flex; }
+  .canvas .controls {
+    left: calc(12px + var(--safe-left));
+    right: calc(12px + var(--safe-right));
+    justify-content: space-between;
+    max-width: none;
+  }
   .canvas .controls .secondary-controls {
     display: none;
     position: absolute;
@@ -498,6 +556,7 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
     margin-top: 8px;
     flex-direction: column;
     align-items: flex-end;
+    max-width: min(72vw, 320px);
   }
   .canvas .controls .secondary-controls.is-open { display: flex; }
 }
@@ -533,8 +592,36 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   .legend-chip { font-size: 17px; }
   .legend-spark { width: 30px; }
 
-  .canvas .controls { top: 10px; right: calc(10px + var(--safe-right)); gap: 6px; }
+  .canvas .controls {
+    top: 10px;
+    left: calc(10px + var(--safe-left));
+    right: calc(10px + var(--safe-right));
+    gap: 6px;
+  }
   .canvas .controls .chip { font-size: 15px; padding: 2px 8px; min-height: 28px; }
+  .canvas .controls .secondary-controls {
+    right: auto;
+    left: 0;
+    align-items: flex-start;
+  }
+
+  .bottom-bar {
+    gap: 8px;
+    padding-top: 8px;
+  }
+  .bottom-bar .play-btn { order: 1; }
+  .scrubber {
+    order: 2;
+    flex: 1 1 100%;
+    height: clamp(44px, 9svh, 64px);
+  }
+  .window-controls {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+  .window-controls .window-label { max-width: 70vw; }
 
   .quotecard {
     position: relative;
@@ -578,6 +665,7 @@ h1, h2, h3 { font-family: var(--font-hand); font-weight: 600; letter-spacing: 0.
   .canvas svg.constellation g.margins text.time-anchor {
     display: none;
   }
+  .window-controls .window-label { max-width: 64vw; }
 }
 
 /* ------------------------------------------------------------------ */

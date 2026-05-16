@@ -79,6 +79,10 @@ the Vite/TS app.
   chain (svg rect -> container rect -> `window.inner*`) plus a
   `requestAnimationFrame` retry. Also attach a `ResizeObserver` so the
   visualization recovers when layout settles.
+- **Timeline window changes should go through `Scrubber`.** Use
+  `setWindow` / `shiftByDays` / `shiftByFraction` / `jumpToLatest`
+  instead of ad-hoc `refresh(from, to)` calls so the scrubber overlay,
+  date label, mode switching, and fetch lifecycle stay synchronized.
 - **Category "public" may be near-empty** until the Reddit/Bluesky/
   NewsAPI ingest keys are configured. GDELT only emits `business`. If
   you're filtering the constellation to `public` and seeing nothing,
@@ -89,6 +93,10 @@ the Vite/TS app.
 - **E2E lives in `web/e2e/`** (Playwright, iPhone 12 + Pixel 5). API
   calls must be stubbed with `page.route` so the test is hermetic; see
   `web/e2e/mobile-constellation.spec.ts`.
+- **In mobile E2E, always complete the landing transition first.** Use a
+  shared helper that clicks `Enter` and waits for `.landing` to be
+  removed before interacting with stage controls; this avoids flake from
+  overlay pointer interception and fade timing.
 - **Ruff is scoped narrowly** (E/F/W only). Broadening it to `I/B/UP`
   is intentional future work -- do it in a dedicated cleanup PR so
   auto-fixes don't mask real review diffs.
