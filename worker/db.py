@@ -1,5 +1,6 @@
 from datetime import datetime
-from sqlalchemy import create_engine, String, Float, Integer, DateTime, JSON, Index, Text
+
+from sqlalchemy import JSON, DateTime, Float, Index, Integer, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from .config import get_settings

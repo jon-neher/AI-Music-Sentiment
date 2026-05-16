@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 import httpx
 
@@ -62,7 +62,7 @@ def fetch(from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
                 if not pub_str:
                     continue
                 try:
-                    published = datetime.strptime(pub_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    published = datetime.strptime(pub_str, "%Y-%m-%d").replace(tzinfo=UTC)
                 except ValueError:
                     continue
                 if published < from_dt or published > to_dt:

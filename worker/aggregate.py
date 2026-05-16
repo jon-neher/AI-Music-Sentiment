@@ -1,13 +1,12 @@
 """Daily aggregate roll-ups."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List
 import statistics
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, and_, delete
+from sqlalchemy import and_, delete, select
 
-from .db import Post, DailyAggregate, SessionLocal, init_db
+from .db import DailyAggregate, Post, SessionLocal, init_db
 
 
 def rollup_range(from_day: datetime, to_day: datetime) -> int:
@@ -26,7 +25,7 @@ def rollup_range(from_day: datetime, to_day: datetime) -> int:
             ).all()
             s.execute(delete(DailyAggregate).where(DailyAggregate.day == day))
 
-            groups: Dict[tuple, List[Post]] = {}
+            groups: dict[tuple, list[Post]] = {}
             for p in rows:
                 groups.setdefault((p.source, p.category), []).append(p)
 
@@ -34,7 +33,7 @@ def rollup_range(from_day: datetime, to_day: datetime) -> int:
                 sentiments = [p.sentiment for p in items]
                 mean = sum(sentiments) / len(sentiments)
                 var = statistics.pvariance(sentiments) if len(sentiments) > 1 else 0.0
-                emo_sum: Dict[str, float] = {}
+                emo_sum: dict[str, float] = {}
                 for p in items:
                     for k, v in (p.emotions or {}).items():
                         emo_sum[k] = emo_sum.get(k, 0.0) + float(v)
@@ -59,5 +58,5 @@ def rollup_range(from_day: datetime, to_day: datetime) -> int:
 
 
 def rollup_recent(days: int = 3) -> int:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return rollup_range(now - timedelta(days=days), now)

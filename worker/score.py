@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Dict, List
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +75,7 @@ def _init_pipelines(sentiment_model: str, emotion_model: str) -> None:
         _TRANSFORMERS_OK = False
 
 
-def _lexicon_score(text: str) -> tuple[float, Dict[str, float]]:
+def _lexicon_score(text: str) -> tuple[float, dict[str, float]]:
     t = (text or "").lower()
     toks = set(t.split())
     pos = len(toks & _POS)
@@ -102,7 +101,7 @@ def _polarity(label: str, score: float) -> float:
     return 0.0
 
 
-def score_batch(texts: List[str], sentiment_model: str, emotion_model: str) -> List[tuple[float, Dict[str, float]]]:
+def score_batch(texts: list[str], sentiment_model: str, emotion_model: str) -> list[tuple[float, dict[str, float]]]:
     _init_pipelines(sentiment_model, emotion_model)
     if not _TRANSFORMERS_OK:
         return [_lexicon_score(t) for t in texts]
@@ -118,14 +117,14 @@ def score_batch(texts: List[str], sentiment_model: str, emotion_model: str) -> L
     # Only run the emotion model on texts whose sentiment cleared the
     # magnitude threshold. Neutral items get a canned {"neutral": 1.0} vector.
     emo_indices = [i for i, p in enumerate(polarities) if abs(p) >= _EMOTION_MIN_MAGNITUDE]
-    emo_results: Dict[int, Dict[str, float]] = {}
+    emo_results: dict[int, dict[str, float]] = {}
     if emo_indices:
         try:
             emo_out = _EMO_PIPE([texts[i] for i in emo_indices], batch_size=16)
         except Exception as e:
             log.warning("Emotion inference failed (%s); defaulting to neutral", e)
             emo_out = []
-        for idx, raw in zip(emo_indices, emo_out):
+        for idx, raw in zip(emo_indices, emo_out, strict=False):
             emo_vec = {lbl: 0.0 for lbl in _EMOTION_LABELS}
             items = raw if isinstance(raw, list) else [raw]
             for item in items:
@@ -134,7 +133,7 @@ def score_batch(texts: List[str], sentiment_model: str, emotion_model: str) -> L
                     emo_vec[lbl] = float(item["score"])
             emo_results[idx] = emo_vec
 
-    results: List[tuple[float, Dict[str, float]]] = []
+    results: list[tuple[float, dict[str, float]]] = []
     for i, polarity in enumerate(polarities):
         results.append((polarity, emo_results.get(i, dict(_NEUTRAL_EMOTIONS))))
     return results

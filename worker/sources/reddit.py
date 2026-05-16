@@ -14,8 +14,8 @@ are `public`.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Iterable, Optional
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 import httpx
 
@@ -45,7 +45,7 @@ def _category_for(sub: str) -> str:
     return "business" if sub.lower() in _BUSINESS_SUBS else "public"
 
 
-def _get_token(client_id: str, client_secret: str, user_agent: str) -> Optional[str]:
+def _get_token(client_id: str, client_secret: str, user_agent: str) -> str | None:
     try:
         r = httpx.post(
             _OAUTH_URL,
@@ -61,7 +61,7 @@ def _get_token(client_id: str, client_secret: str, user_agent: str) -> Optional[
         return None
 
 
-def _emit_submission(d: dict, sub: str) -> Optional[RawPost]:
+def _emit_submission(d: dict, sub: str) -> RawPost | None:
     sub_id = d.get("id")
     if not sub_id:
         return None
@@ -78,7 +78,7 @@ def _emit_submission(d: dict, sub: str) -> Optional[RawPost]:
         snippet=body[:500],
         url="https://reddit.com" + (d.get("permalink") or ""),
         author=d.get("author") or "",
-        published_at=datetime.fromtimestamp(created, tz=timezone.utc),
+        published_at=datetime.fromtimestamp(created, tz=UTC),
         reach=int(d.get("ups") or 0) + int(d.get("num_comments") or 0),
         topics=[sub],
     )
@@ -120,7 +120,7 @@ def _iter_comments(
             snippet=body[:500],
             url="https://reddit.com" + (cd.get("permalink") or ""),
             author=author,
-            published_at=datetime.fromtimestamp(created, tz=timezone.utc),
+            published_at=datetime.fromtimestamp(created, tz=UTC),
             reach=int(cd.get("score") or 0),
             topics=[sub],
         )
@@ -137,6 +137,7 @@ def _known_submission_ids(ids: list[str]) -> set[str]:
         return set()
     try:
         from sqlalchemy import select
+
         from ..db import Post, SessionLocal
         with SessionLocal() as s:
             return set(s.scalars(
@@ -152,7 +153,7 @@ def _walk_sub(
     client: httpx.Client, sub: str, keyword_filter: bool,
     keywords: list[str], from_ts: int, to_ts: int,
 ) -> Iterable[RawPost]:
-    after: Optional[str] = None
+    after: str | None = None
     all_known_streak = 0
     for _ in range(_LISTING_PAGE_CAP):
         params: dict = {"limit": 100}

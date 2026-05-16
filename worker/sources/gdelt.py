@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 import httpx
 
@@ -31,7 +31,7 @@ def fetch(from_dt: datetime, to_dt: datetime, max_records: int = 250) -> Iterabl
         return
     for a in data.get("articles", []):
         try:
-            published = datetime.strptime(a["seendate"], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+            published = datetime.strptime(a["seendate"], "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
         except Exception:
             continue
         url = a.get("url") or ""

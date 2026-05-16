@@ -4,7 +4,7 @@ SHELL := bash
 PY ?= $(shell command -v python3.11 2>/dev/null || command -v python3)
 VENV_API := .venv-api
 VENV_WORKER := .venv-worker
-SMOKE_DB_URL ?= sqlite+pysqlite:///tmp/sentiment.db
+SMOKE_DB_URL ?= sqlite+pysqlite:////tmp/sentiment.db
 
 .PHONY: help install install-api install-web install-worker \
         typecheck build test test-api test-web lint check-prod \

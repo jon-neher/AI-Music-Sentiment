@@ -10,9 +10,9 @@ import hashlib
 import html
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Iterable
+from datetime import UTC, datetime, timedelta
 
 import feedparser
 import httpx
@@ -54,7 +54,7 @@ def _matches(text: str, keywords: list[str]) -> bool:
 
 
 def fetch(cfg: FeedConfig, from_dt: datetime, to_dt: datetime) -> Iterable[RawPost]:
-    if to_dt < datetime.now(timezone.utc) - _HISTORICAL_CUTOFF:
+    if to_dt < datetime.now(UTC) - _HISTORICAL_CUTOFF:
         log.debug("%s: window ends %s, older than RSS horizon; skipping.",
                   cfg.source, to_dt.date())
         return
@@ -98,7 +98,7 @@ def fetch(cfg: FeedConfig, from_dt: datetime, to_dt: datetime) -> Iterable[RawPo
         if not dt_tuple:
             continue
         try:
-            published = datetime(*dt_tuple[:6], tzinfo=timezone.utc)
+            published = datetime(*dt_tuple[:6], tzinfo=UTC)
         except Exception:
             continue
         if published < from_dt or published > to_dt:

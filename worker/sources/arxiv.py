@@ -1,12 +1,12 @@
 """arXiv ingest via the public export API. Category = science."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from urllib.parse import urlencode
 
-import httpx
 import feedparser
+import httpx
 
 from . import RawPost
 
@@ -34,7 +34,7 @@ def fetch(from_dt: datetime, to_dt: datetime, max_results_per_page: int = 200) -
         out_of_range = False
         for e in feed.entries:
             try:
-                published = datetime(*e.published_parsed[:6], tzinfo=timezone.utc)
+                published = datetime(*e.published_parsed[:6], tzinfo=UTC)
             except Exception:
                 continue
             if published < from_dt:

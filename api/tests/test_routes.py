@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-
-from app.models import Post, DailyAggregate
+from app.models import DailyAggregate, Post
 from app.schemas import PostOut
 
 
@@ -15,7 +14,7 @@ def _mk_post(id_: str, *, category: str = "public", sentiment: float = 0.1,
         snippet="",
         url=f"https://example.com/{id_}",
         author="",
-        published_at=published_at or datetime(2025, 6, 1, tzinfo=timezone.utc),
+        published_at=published_at or datetime(2025, 6, 1, tzinfo=UTC),
         sentiment=sentiment,
         emotions={"joy": 0.2},
         topics=["ai"],
@@ -40,8 +39,8 @@ def test_stats_empty_db(client):
 
 
 def test_window_empty_db(client):
-    from_ = datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat()
-    to = datetime(2025, 12, 31, tzinfo=timezone.utc).isoformat()
+    from_ = datetime(2025, 1, 1, tzinfo=UTC).isoformat()
+    to = datetime(2025, 12, 31, tzinfo=UTC).isoformat()
     r = client.get("/api/window", params={"from": from_, "to": to})
     assert r.status_code == 200, r.text
     body = r.json()
@@ -53,7 +52,7 @@ def test_window_empty_db(client):
 
 
 def test_window_orders_by_reach_desc_and_filters_by_category(client, db_session):
-    published = datetime(2025, 6, 15, tzinfo=timezone.utc)
+    published = datetime(2025, 6, 15, tzinfo=UTC)
     db_session.add_all([
         _mk_post("a", category="public", reach=10, published_at=published),
         _mk_post("b", category="science", reach=99, published_at=published),
@@ -63,8 +62,8 @@ def test_window_orders_by_reach_desc_and_filters_by_category(client, db_session)
     db_session.commit()
 
     r = client.get("/api/window", params={
-        "from": datetime(2025, 6, 1, tzinfo=timezone.utc).isoformat(),
-        "to": datetime(2025, 6, 30, tzinfo=timezone.utc).isoformat(),
+        "from": datetime(2025, 6, 1, tzinfo=UTC).isoformat(),
+        "to": datetime(2025, 6, 30, tzinfo=UTC).isoformat(),
     })
     assert r.status_code == 200, r.text
     ids = [p["id"] for p in r.json()["exemplars"]]
@@ -72,8 +71,8 @@ def test_window_orders_by_reach_desc_and_filters_by_category(client, db_session)
 
     # Category filter narrows the result set.
     r2 = client.get("/api/window", params={
-        "from": datetime(2025, 6, 1, tzinfo=timezone.utc).isoformat(),
-        "to": datetime(2025, 6, 30, tzinfo=timezone.utc).isoformat(),
+        "from": datetime(2025, 6, 1, tzinfo=UTC).isoformat(),
+        "to": datetime(2025, 6, 30, tzinfo=UTC).isoformat(),
         "sources": "public",
     })
     assert r2.status_code == 200
@@ -82,15 +81,15 @@ def test_window_orders_by_reach_desc_and_filters_by_category(client, db_session)
 
 
 def test_window_excludes_rows_outside_time_bounds(client, db_session):
-    in_range = _mk_post("in", published_at=datetime(2025, 6, 15, tzinfo=timezone.utc))
-    too_old = _mk_post("old", published_at=datetime(2024, 1, 1, tzinfo=timezone.utc))
-    too_new = _mk_post("new", published_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    in_range = _mk_post("in", published_at=datetime(2025, 6, 15, tzinfo=UTC))
+    too_old = _mk_post("old", published_at=datetime(2024, 1, 1, tzinfo=UTC))
+    too_new = _mk_post("new", published_at=datetime(2026, 1, 1, tzinfo=UTC))
     db_session.add_all([in_range, too_old, too_new])
     db_session.commit()
 
     r = client.get("/api/window", params={
-        "from": datetime(2025, 6, 1, tzinfo=timezone.utc).isoformat(),
-        "to": datetime(2025, 6, 30, tzinfo=timezone.utc).isoformat(),
+        "from": datetime(2025, 6, 1, tzinfo=UTC).isoformat(),
+        "to": datetime(2025, 6, 30, tzinfo=UTC).isoformat(),
     })
     ids = {p["id"] for p in r.json()["exemplars"]}
     assert ids == {"in"}
@@ -111,13 +110,13 @@ def test_post_detail_and_404(client, db_session):
 def test_aggregates_returned_in_window(client, db_session):
     db_session.add_all([
         DailyAggregate(
-            day=datetime(2025, 6, 10, tzinfo=timezone.utc),
+            day=datetime(2025, 6, 10, tzinfo=UTC),
             source="gdelt", category="business",
             mean_sentiment=0.1, variance=0.02, volume=12,
             emotions={}, exemplar_ids=["a", "b"],
         ),
         DailyAggregate(
-            day=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            day=datetime(2024, 1, 1, tzinfo=UTC),
             source="gdelt", category="business",
             mean_sentiment=-0.2, variance=0.01, volume=5,
             emotions={}, exemplar_ids=[],
@@ -126,8 +125,8 @@ def test_aggregates_returned_in_window(client, db_session):
     db_session.commit()
 
     r = client.get("/api/window", params={
-        "from": datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat(),
-        "to": datetime(2025, 12, 31, tzinfo=timezone.utc).isoformat(),
+        "from": datetime(2025, 1, 1, tzinfo=UTC).isoformat(),
+        "to": datetime(2025, 12, 31, tzinfo=UTC).isoformat(),
     })
     aggs = r.json()["aggregates"]
     assert len(aggs) == 1

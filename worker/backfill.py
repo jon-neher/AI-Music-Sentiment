@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import argparse
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from dateutil.relativedelta import relativedelta
 
+from .aggregate import rollup_range
 from .config import get_settings
 from .ingest import run_window
-from .aggregate import rollup_range
 
 log = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ def main() -> None:
     args = ap.parse_args()
 
     settings = get_settings()
-    start = datetime.fromisoformat(args.start or settings.backfill_start).replace(tzinfo=timezone.utc)
-    end = datetime.fromisoformat(args.end).replace(tzinfo=timezone.utc) if args.end else datetime.now(timezone.utc)
+    start = datetime.fromisoformat(args.start or settings.backfill_start).replace(tzinfo=UTC)
+    end = datetime.fromisoformat(args.end).replace(tzinfo=UTC) if args.end else datetime.now(UTC)
     run_backfill(start, end)
 
 
