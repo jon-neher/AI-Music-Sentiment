@@ -1,10 +1,14 @@
 import * as d3 from "d3";
 import type { AggregateOut } from "../data/api";
 
+const DAY_MS = 86400_000;
+const DRAG_EMIT_THROTTLE_MS = 140;
+
 export interface ScrubberOpts {
   start: Date;
   end: Date;
   onWindow: (from: Date, to: Date) => void;
+  onInteract?: () => void;
 }
 
 export class Scrubber {
@@ -12,29 +16,112 @@ export class Scrubber {
   private opts: ScrubberOpts;
   private windowFrom: Date;
   private windowTo: Date;
+  private lastAggregates: AggregateOut[] = [];
+  private lastEmitMs = 0;
+  private redrawQueued = false;
 
   constructor(container: HTMLElement, opts: ScrubberOpts) {
     this.opts = opts;
     this.windowFrom = new Date(opts.end.getTime() - 1000 * 60 * 60 * 24 * 30);
     this.windowTo = opts.end;
     container.innerHTML = "";
-    this.svg = d3.select(container).append("svg");
+    this.svg = d3.select(container).append("svg")
+      .style("touch-action", "none")
+      .style("user-select", "none")
+      .style("-webkit-user-select", "none");
     this.draw([]);
+
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => this.queueRedraw());
+      ro.observe(container);
+    }
+    window.addEventListener("resize", () => this.queueRedraw(), { passive: true });
+  }
+
+  private queueRedraw(): void {
+    if (this.redrawQueued) return;
+    this.redrawQueued = true;
+    requestAnimationFrame(() => {
+      this.redrawQueued = false;
+      this.draw(this.lastAggregates);
+    });
+  }
+
+  private clampWindow(from: Date, to: Date): [Date, Date] {
+    const domainStart = this.opts.start.getTime();
+    const domainEnd = this.opts.end.getTime();
+    const domainSpan = Math.max(DAY_MS, domainEnd - domainStart);
+
+    const fromMs = from.getTime();
+    const toMs = to.getTime();
+    const center = (fromMs + toMs) / 2;
+    const span = Math.min(domainSpan, Math.max(DAY_MS, Math.abs(toMs - fromMs)));
+
+    const minCenter = domainStart + span / 2;
+    const maxCenter = domainEnd - span / 2;
+    const boundedCenter = Math.max(minCenter, Math.min(maxCenter, center));
+
+    return [new Date(boundedCenter - span / 2), new Date(boundedCenter + span / 2)];
+  }
+
+  private emitWindow(force = false): void {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (!force && now - this.lastEmitMs < DRAG_EMIT_THROTTLE_MS) return;
+    this.lastEmitMs = now;
+    this.opts.onWindow(new Date(this.windowFrom), new Date(this.windowTo));
+  }
+
+  setWindow(from: Date, to: Date, emit = true): void {
+    [this.windowFrom, this.windowTo] = this.clampWindow(from, to);
+    this.draw(this.lastAggregates);
+    if (emit) this.emitWindow(true);
+  }
+
+  shiftByDays(days: number, emit = true): void {
+    const delta = days * DAY_MS;
+    this.setWindow(
+      new Date(this.windowFrom.getTime() + delta),
+      new Date(this.windowTo.getTime() + delta),
+      emit,
+    );
+  }
+
+  shiftByFraction(fraction: number, emit = true): void {
+    const span = this.windowTo.getTime() - this.windowFrom.getTime();
+    const delta = span * fraction;
+    this.setWindow(
+      new Date(this.windowFrom.getTime() + delta),
+      new Date(this.windowTo.getTime() + delta),
+      emit,
+    );
+  }
+
+  jumpToLatest(emit = true): void {
+    const span = this.windowTo.getTime() - this.windowFrom.getTime();
+    this.setWindow(
+      new Date(this.opts.end.getTime() - span),
+      new Date(this.opts.end),
+      emit,
+    );
   }
 
   draw(aggregates: AggregateOut[]): void {
+    this.lastAggregates = aggregates;
     const svgNode = this.svg.node()!;
     const { width, height } = svgNode.getBoundingClientRect();
     if (width === 0) return;
 
-    const x = d3.scaleTime().domain([this.opts.start, this.opts.end]).range([16, width - 16]);
+    const pad = 16;
+    const x = d3.scaleTime().domain([this.opts.start, this.opts.end]).range([pad, width - pad]);
     const y = d3.scaleLinear().domain([-1, 1]).range([height - 8, 8]);
+
+    [this.windowFrom, this.windowTo] = this.clampWindow(this.windowFrom, this.windowTo);
 
     this.svg.selectAll("*").remove();
 
     // Neutral axis at sentiment = 0
     this.svg.append("line")
-      .attr("x1", 16).attr("x2", width - 16)
+      .attr("x1", pad).attr("x2", width - pad)
       .attr("y1", y(0)).attr("y2", y(0))
       .attr("stroke", "rgba(0,0,0,0.25)").attr("stroke-dasharray", "2 3");
 
@@ -130,19 +217,36 @@ export class Scrubber {
     };
     drawWindow();
 
+    const moveWindowTo = (pixelX: number) => {
+      const spanPx = Math.max(2, x(this.windowTo).valueOf() - x(this.windowFrom).valueOf());
+      const boundedCenter = Math.max(pad + spanPx / 2, Math.min(width - pad - spanPx / 2, pixelX));
+      this.windowFrom = x.invert(boundedCenter - spanPx / 2);
+      this.windowTo = x.invert(boundedCenter + spanPx / 2);
+      drawWindow();
+    };
+
     const drag = d3.drag<SVGSVGElement, unknown>()
-      .on("start drag", (event) => {
-        const mx = event.x;
-        const w = x(this.windowTo).valueOf() - x(this.windowFrom).valueOf();
-        const newCenter = Math.max(16 + w / 2, Math.min(width - 16 - w / 2, mx));
-        this.windowFrom = x.invert(newCenter - w / 2);
-        this.windowTo = x.invert(newCenter + w / 2);
-        drawWindow();
+      .on("start", (event) => {
+        this.opts.onInteract?.();
+        moveWindowTo(event.x);
+        this.emitWindow(false);
+      })
+      .on("drag", (event) => {
+        moveWindowTo(event.x);
+        this.emitWindow(false);
       })
       .on("end", () => {
-        this.opts.onWindow(this.windowFrom, this.windowTo);
+        this.emitWindow(true);
       });
     this.svg.call(drag as any);
+
+    this.svg.on("click.scrub", (event: MouseEvent) => {
+      if (event.defaultPrevented) return;
+      this.opts.onInteract?.();
+      const [mx] = d3.pointer(event, svgNode);
+      moveWindowTo(mx);
+      this.emitWindow(true);
+    });
   }
 
   getWindow(): [Date, Date] { return [this.windowFrom, this.windowTo]; }

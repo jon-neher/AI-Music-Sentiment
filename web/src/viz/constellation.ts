@@ -145,8 +145,29 @@ export class Constellation {
 
     if (posts.length === 0) {
       this.dotsLayer.selectAll<SVGPathElement, PostOut>("path.dot").remove();
-      this.marginsLayer.selectAll("*").remove();
       this.axesLayer.selectAll("*").remove();
+      this.marginsLayer.selectAll("*").remove();
+      this.marginsLayer.append("text")
+        .attr("class", "axis-annot empty-state")
+        .attr("x", width / 2)
+        .attr("y", height / 2 - 8)
+        .attr("text-anchor", "middle")
+        .attr("fill", "var(--ink-soft)")
+        .attr("fill-opacity", 0.68)
+        .attr("font-family", "var(--font-hand)")
+        .attr("font-size", 20)
+        .attr("font-style", "italic")
+        .text("No posts in this window");
+      this.marginsLayer.append("text")
+        .attr("class", "axis-annot empty-subtitle")
+        .attr("x", width / 2)
+        .attr("y", height / 2 + 12)
+        .attr("text-anchor", "middle")
+        .attr("fill", "var(--ink-soft)")
+        .attr("fill-opacity", 0.58)
+        .attr("font-family", "var(--font-serif)")
+        .attr("font-size", 12)
+        .text("Drag the timeline or use arrows to see nearby periods.");
       return;
     }
 
